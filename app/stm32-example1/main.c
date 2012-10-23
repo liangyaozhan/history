@@ -1,5 +1,5 @@
 
-#include "os.h"
+#include "rtk.h"
 
 
 
@@ -36,8 +36,7 @@ int rand()
     return r;
 }
 
-MSGQ_DECL_NO_INIT(test_msgq, sizeof(int)*10);
-
+MSGQ_DECL_NO_INIT(GLOBAL, test_msgq, sizeof(int)*10);
 
 static void uart_task( char *pa, void *pb)
 {
@@ -99,7 +98,7 @@ void main_task( void *pa, void *pb)
 		task_delay(rand()%500);
         
         ++i;
-        ret = msgq_send( &test_msgq.msgq, &i, sizeof(i), 10 );
+        ret = msgq_send( &test_msgq, &i, sizeof(i), 10 );
         if ( ret == 0 ) {
             kprintf("msgq_send OK pri=%d\n", CURRENT_TASK_PRIORITY());
         } else {
@@ -120,11 +119,13 @@ void can_tester_init( void );
 
 int main()
 {
-	TASK_INFO_DECL(static, info_uart1, 512*2);
-	TASK_INFO_DECL(static, info_uart2, 512*2);
-    TASK_INFO_DECL(static, info_led,   512*2);
-    TASK_INFO_DECL(static, info_led1,   512*2);
-	TASK_INFO_DECL(static, info_root,  1024);
+	static TASK_INFO_DECL(info_uart1, 512*2);
+	static TASK_INFO_DECL(info_uart2, 512*2);
+    static TASK_INFO_DECL(info_led,   512*2);
+    static TASK_INFO_DECL(info_led1,   512*2);
+	static TASK_INFO_DECL( info_root,  1024);
+
+    
     arch_interrupt_disable();
 
 	rt_hw_led_init();

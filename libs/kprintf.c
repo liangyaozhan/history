@@ -1,8 +1,8 @@
-/* Last modified Time-stamp: <2012-10-21 13:31:52 Sunday by lyzh>
+/* Last modified Time-stamp: <2012-10-23 19:04:01 Tuesday by lyzh>
  * @(#)kprintf.c
  */
 
-#include "os.h"
+#include "rtk.h"
 #include <stdarg.h>
 
 

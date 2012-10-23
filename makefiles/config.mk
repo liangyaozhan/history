@@ -16,6 +16,7 @@
 
 CPU     ?= cortex-m3
 BSP_NAME ?= stm32f10x
+ARMARCH  ?= armv7m
 
 # 版本定义:debug 或者 release. 默认是debug
 # debug版带调试信息,release 不带调试信息

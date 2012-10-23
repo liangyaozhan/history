@@ -1,8 +1,8 @@
-/* Last modified Time-stamp: <2012-10-21 12:38:30 Sunday by lyzh>
+/* Last modified Time-stamp: <2012-10-23 18:57:23 Tuesday by lyzh>
  * @(#)bsp.c
  */
 
-#include "os.h"
+#include "rtk.h"
 
 #define RT_USING_UART1
 

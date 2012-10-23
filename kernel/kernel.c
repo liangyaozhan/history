@@ -1,8 +1,8 @@
-/* Last modified Time-stamp: <2012-10-21 09:30:15 Sunday by lyzh>
+/* Last modified Time-stamp: <2012-10-24 07:48:05 Wednesday by lyzh>
  * @(#)kernel.c
  */
 #include "list.h"
-#include "os.h"
+#include "rtk.h"
 #include "err.h"
 
 #define PRIO_NODE_TO_PTCB(pNode)        list_entry(pNode, tcb_t, prio_node)
@@ -13,7 +13,7 @@
 #define DELAY_Q_PUT(ptcb, tick)         softtimer_add( &(ptcb)->tick_node, tick )
 #define DELAY_Q_REMOVE(ptcb)            softtimer_remove( &(ptcb)->tick_node )
 #define PLIST_PTR_TO_SEMID( ptr )       list_entry( (ptr), semaphore_t, pending_tasks )
-#define SEM_MEMBER_PTR_TO_SEMID( ptr )  list_entry( (ptr), semaphore_t, sem_member_node )
+#define SEM_MEMBER_PTR_TO_SEMID( ptr )  list_entry( (ptr), mutex_t, sem_member_node )
 #define NULL                       ((void*)0)
 #define delay_node_init( p, tick )              \
     do {                                        \
@@ -22,16 +22,20 @@
         (pdn)->uiTick    = (tick);              \
     } while (0)
 
-#define inline
 #undef int_min
 #define int_min(a, b) ((a)>(b)?(b):(a))
 
+#if (MAX_PRIORITY&(32-1))
+#define __MAX_GROUPS    (MAX_PRIORITY/32+1)
+#else
+#define __MAX_GROUPS    (MAX_PRIORITY/32)
+#endif
 
 struct __priority_q_bitmap_head
 {
     pqn_t       *phighest_node; 
     unsigned int      bitmap_group;
-    uint32_t          bitmap_tasks[MAX_PRIORITY/32+1];
+    uint32_t          bitmap_tasks[__MAX_GROUPS];
     struct list_head  tasks[MAX_PRIORITY];
 };
 typedef struct __priority_q_bitmap_head priority_q_bitmap_head_t;
@@ -47,12 +51,12 @@ int                              is_int_context;
 struct list_head                 GlistAllTaskListHead;
 
 static inline void                          __put_tcb_to_pendlist( semaphore_t *semid, tcb_t *ptcbToAdd );
-static int                                  __mutex_owner_set( semaphore_t *semid, tcb_t *ptcbToAdd );
+static int                                  __mutex_owner_set( mutex_t *semid, tcb_t *ptcbToAdd );
 static inline int                           __get_pend_list_priority ( semaphore_t *semid );
 static inline int                           __get_mutex_hold_list_priority ( tcb_t *ptcb );
 static inline struct list_head             *__sem_pend_list_get_and_remove_first_node( semaphore_t *semid );
-static void                                 __mutex_priority_inheritance( semaphore_t *semid );
-static void                                 __restore_current_task_priority( semaphore_t *semid );
+static void                                 __mutex_priority_inheritance( mutex_t *semid );
+static void                                 __restore_current_task_priority( mutex_t *semid );
 static void                                 task_delay_timeout( softtimer_t *pdn );
 static void                                 priority_q_init( priority_q_bitmap_head_t *pqriHead );
 static int                                  priority_q_put( priority_q_bitmap_head_t *pqHead, pqn_t *pNode, int key );
@@ -63,12 +67,13 @@ static void                                 softtimer_remove ( softtimer_t *pdn 
 void                                        softtimer_anounce( void );
 void                                        context_switch_start( void );
 void                                        __release_holded_mutex( tcb_t *ptcb );
-static void                                 __release_one_mutex( semaphore_t *semid );
+static void                                 __release_one_mutex( mutex_t *semid );
 static tcb_t                               *highest_tcb_get( void );
 extern void                                 arch_context_switch(void **fromsp, void **tosp);
 extern void                                 arch_context_switch_interrupt(void **fromsp, void **tosp);
 void                                        arch_context_switch_to(void **sp);
 static void                                 schedule_internel( void );
+static int                                  __mutex_raise_owner_priority( mutex_t *semid, tcb_t *powner, int priority );
 extern unsigned char *arch_stack_init(void *tentry, void *parameter1, void *parameter2,
                                       char        *stack_low, char *stack_high, void *texit);
 
@@ -123,7 +128,7 @@ int priority_q_put( priority_q_bitmap_head_t *pqHead, pqn_t *pNode, int key )
 {
     ASSERT( key < 256 && key >= 0 );
     ASSERT( NULL != pqHead && pNode != NULL );
-	
+    
     pNode->key = key;
     priority_q_bitmap_set( pqHead, key );
     list_add_tail( &pNode->node, &pqHead->tasks[key] );
@@ -194,7 +199,7 @@ static tcb_t *highest_tcb_get( void )
 void os_startup( void )
 {
     tcb_t *ptcb = PRIO_NODE_TO_PTCB( g_readyq.phighest_node );
-	arch_context_switch_to(&ptcb->sp);
+    arch_context_switch_to(&ptcb->sp);
 }
 
 void softtimer_add(softtimer_t *pdn, unsigned int uiTick)
@@ -263,7 +268,7 @@ void softtimer_anounce( void )
             pNext = LIST_FIRST(p);
             pNode = list_entry(p, softtimer_t, node);
             if ( pNode->uiTick == 0) {
-            	list_del_init( &pNode->node );
+                list_del_init( &pNode->node );
                 if ( pNode->timeout_func ) {
                     (*pNode->timeout_func)( pNode );
                 }
@@ -281,16 +286,14 @@ void softtimer_anounce( void )
 static void __sem_init_common( semaphore_t *semid )
 {
     semid->u.count               = 0;
-    semid->mutex_recurse_count = 0;
     INIT_LIST_HEAD( &semid->pending_tasks );
-    INIT_LIST_HEAD( &semid->sem_member_node );
 }
 
 int sem_counter_init( semaphore_t *semid, int InitCount )
 {
     __sem_init_common( semid );
     semid->u.count = InitCount;
-    semid->type  = SEM_TYPE_COUNT;
+    semid->type  = SEM_TYPE_COUNTER;
     return 0;
 }
 
@@ -304,23 +307,25 @@ int sem_binary_init( semaphore_t *semid, int InitCount )
 
 int sem_binary_clear( semaphore_t *semid )
 {
-	int old;
-	
-	old = arch_interrupt_disable();
-	semid->u.count = 0;
-	arch_interrupt_enable(old );
-	return 0;
+    int old;
+    
+    old = arch_interrupt_disable();
+    semid->u.count = 0;
+    arch_interrupt_enable(old );
+    return 0;
 }
 
 int sem_counter_clear( semaphore_t *semid )
 {
-	return sem_binary_clear(semid);
+    return sem_binary_clear(semid);
 }
 
-int mutex_init( semaphore_t *semid )
+int mutex_init( mutex_t *semid )
 {
-    __sem_init_common( semid );
-    semid->type                 = SEM_TYPE_MUTEX;
+    __sem_init_common( (semaphore_t*)semid );
+    INIT_LIST_HEAD( &semid->sem_member_node );
+    semid->mutex_recurse_count  = 0;
+    semid->s.type                 = SEM_TYPE_MUTEX;
     return 0;
 }
 
@@ -485,7 +490,7 @@ int sem_counter_take( semaphore_t *semid, unsigned int tick )
     return -1;
 }
 
-int mutex_lock( semaphore_t *semid, unsigned int tick )
+int mutex_lock( mutex_t *semid, unsigned int tick )
 {
     int old;
     int TaskStatus = 0;
@@ -494,19 +499,19 @@ int mutex_lock( semaphore_t *semid, unsigned int tick )
     if ( unlikely(IS_INT_CONTEXT()) ) {
         return -1;
     }
-    if ( unlikely(semid->type != SEM_TYPE_MUTEX) ) {
+    if ( unlikely(semid->s.type != SEM_TYPE_MUTEX) ) {
         return -1;
     }
 #endif
     
     old = arch_interrupt_disable();
 
-    if ( semid->u.owner == NULL ) {
+    if ( semid->s.u.owner == NULL ) {
         __mutex_owner_set( semid, ptcb_current );
         semid->mutex_recurse_count++;
         arch_interrupt_enable(old );
         return 0;
-    } else if ( semid->u.owner == ptcb_current ) {
+    } else if ( semid->s.u.owner == ptcb_current ) {
         semid->mutex_recurse_count++;
         arch_interrupt_enable(old );
         return 0;
@@ -527,7 +532,7 @@ int mutex_lock( semaphore_t *semid, unsigned int tick )
     /*
      *  remember which list we are pending on.
      */
-    ptcb_current->psem_list      = &semid->pending_tasks;
+    ptcb_current->psem_list      = &semid->s.pending_tasks;
 
     /*
      *  put tcb into pend list and inherit priority.
@@ -541,7 +546,7 @@ int mutex_lock( semaphore_t *semid, unsigned int tick )
      *  we are not pending on any list now
      */
     ptcb_current->psem_list      = NULL;
-    if ( semid->u.owner == NULL ) {
+    if ( semid->s.u.owner == NULL ) {
         __mutex_owner_set( semid, ptcb_current );
         semid->mutex_recurse_count = 1;
         softtimer_remove( &ptcb_current->tick_node );
@@ -566,7 +571,7 @@ int mutex_lock( semaphore_t *semid, unsigned int tick )
     return -1;
 }
 
-int mutex_unlock( semaphore_t *semid )
+int mutex_unlock( mutex_t *semid )
 {
     int old;
 #ifndef KERNEL_NO_ARG_CHECK
@@ -578,7 +583,7 @@ int mutex_unlock( semaphore_t *semid )
     }
 #endif
     old = arch_interrupt_disable();
-    if ( semid->u.owner != ptcb_current ) {
+    if ( semid->s.u.owner != ptcb_current ) {
         arch_interrupt_enable(old );
         return -1;
     }
@@ -595,17 +600,17 @@ int mutex_unlock( semaphore_t *semid )
     return 0;
 }
 
-static void __release_one_mutex( semaphore_t *semid )
+static void __release_one_mutex( mutex_t *semid )
 {
     tcb_t *ptcbWakeup;
     struct list_head *p;
 
-    if ( list_empty( &semid->pending_tasks ) ) {
+    if ( list_empty( &semid->s.pending_tasks ) ) {
         __mutex_owner_set( semid, NULL );
         return ;
     }
     
-    p = __sem_pend_list_get_and_remove_first_node( semid );
+    p = __sem_pend_list_get_and_remove_first_node( (semaphore_t*)semid );
     ptcbWakeup = PEND_NODE_TO_PTCB( p );
     READY_Q_PUT( ptcbWakeup, ptcbWakeup->current_priority );
     ptcbWakeup->status = TASK_READY;
@@ -686,11 +691,11 @@ static inline int __get_pend_list_priority ( semaphore_t *semid )
 
 static inline int __get_mutex_hold_list_priority ( tcb_t *ptcb )
 {
-    semaphore_t *semid;
+    mutex_t *semid;
     
     if ( !list_empty(&ptcb->mutex_holded_head) ) {
         semid = SEM_MEMBER_PTR_TO_SEMID( LIST_FIRST(&ptcb->mutex_holded_head) );
-        return __get_pend_list_priority(semid);
+        return __get_pend_list_priority((semaphore_t*)semid);
     }
     return MAX_PRIORITY;
 }
@@ -710,24 +715,24 @@ void __put_tcb_to_pendlist( semaphore_t *semid, tcb_t *ptcbToAdd )
     list_add_tail( &ptcbToAdd->sem_node, p );
 }
 
-static int  __mutex_owner_set( semaphore_t *semid, tcb_t *ptcbToAdd )
+static int  __mutex_owner_set( mutex_t *semid, tcb_t *ptcbToAdd )
 {
     struct list_head *p;
-    semaphore_t      *psem;
+    mutex_t      *psem;
     int               pri;
 
     if ( NULL == ptcbToAdd ) {
-        semid->u.owner = NULL;
+        semid->s.u.owner = NULL;
         list_del_init( &semid->sem_member_node );
         return 0;
     }
 
-    semid->u.owner              = ptcbToAdd;
+    semid->s.u.owner              = ptcbToAdd;
 
-    pri = __get_pend_list_priority(semid);
+    pri = __get_pend_list_priority((semaphore_t*)semid);
     list_for_each( p, &ptcbToAdd->mutex_holded_head) {
         psem = SEM_MEMBER_PTR_TO_SEMID( p );
-        if ( __get_pend_list_priority( psem ) > pri )  {
+        if ( __get_pend_list_priority( (semaphore_t*)psem ) > pri )  {
             break;
         }
     }
@@ -747,7 +752,7 @@ struct list_head *__sem_pend_list_get_and_remove_first_node( semaphore_t *semid 
     return p;
 }
 
-static int __resort_hold_mutex_list_and_trig( semaphore_t *semid, tcb_t *ptcbOwner )
+static int __resort_hold_mutex_list_and_trig( mutex_t *semid, tcb_t *ptcbOwner )
 {
     int pri;
     
@@ -776,36 +781,121 @@ static int __insert_pend_list_and_trig( semaphore_t *semid, tcb_t *ptcb )
     return pri > __get_pend_list_priority(semid);
 }
 
-static void __mutex_priority_inheritance( semaphore_t *semid )
+int task_priority_set( tcb_t *ptcb, int priority )
 {
-    tcb_t *pOwner;
-    int    priority;
-    
-    pOwner   = semid->u.owner;
-    priority = ptcb_current->current_priority;
+    int old;
+    int need = 0;
+    int ret = 0;
 
-    if ( __insert_pend_list_and_trig( semid, ptcb_current ) ) {
-      again:
-        if ( __resort_hold_mutex_list_and_trig(semid, pOwner) ) {
-            if ( pOwner->current_priority > priority ) {
-                pOwner->current_priority = priority;
-                if ( pOwner->status == TASK_READY ) {
-                    READY_Q_REMOVE( pOwner );
-                    READY_Q_PUT( pOwner, priority );
-                } else if ( pOwner->status & TASK_SUSPEND ) {
-                    semid   = PLIST_PTR_TO_SEMID( pOwner->psem_list );
-                    if ( __resort_pend_list_and_trig( semid, pOwner ) &&
-                         (semid->type == SEM_TYPE_MUTEX) ) {
-                        pOwner = semid->u.owner;
-                        goto again;
-                    }
+    old = arch_interrupt_disable();
+    if ( ptcb->priority == priority ) {
+        goto done;
+    }
+    
+    if ( ptcb->status == TASK_READY ) {
+        need = 1;
+        goto tr;
+    } else if ( ptcb->status & TASK_SUSPEND ) {
+        semaphore_t *semid;
+        int          trig;
+        
+        if ( priority < ptcb->current_priority ) {
+            ptcb->current_priority = ptcb->priority = priority;
+            semid   = PLIST_PTR_TO_SEMID( ptcb->psem_list );
+            trig = __resort_pend_list_and_trig( (semaphore_t*)semid, ptcb );
+            if ( trig && semid->type == SEM_TYPE_MUTEX ) {
+                tcb_t   *powner;
+                mutex_t *m;
+                m = (mutex_t*)semid;
+                powner = m->s.u.owner;
+                __mutex_raise_owner_priority( m, powner, priority );
+            }
+        } else {
+            ptcb->priority = priority;
+        }
+    } else if ( ptcb->status & TASK_DELAYD ) {
+        need = 0;
+        goto tr;
+    }
+    
+    goto done;
+
+tr:
+    if ( priority < ptcb->current_priority ) {
+        /*
+         *  higher than ptcb->current_priority
+         */
+        ptcb->current_priority = ptcb->priority = priority;
+        if ( need ) {
+            READY_Q_REMOVE( ptcb );
+            READY_Q_PUT( ptcb, priority );
+        }
+    } else if ( ptcb->current_priority < ptcb->priority ) {
+        /*
+         *  task was raised up.
+         */
+        ptcb->priority  = priority;
+    } else {
+        /*
+         *  current_priority == priority  TASK is ready
+         */
+        /*
+         *  down,
+         *  check if it can down right now.
+         */
+        if ( __get_mutex_hold_list_priority(ptcb) < priority ) {
+            ptcb->priority  = priority;
+        } else {
+            ptcb->current_priority = ptcb->priority = priority;
+            if ( need ) {
+                READY_Q_REMOVE( ptcb );
+                READY_Q_PUT( ptcb, priority );
+            }
+        }
+    }
+    
+done:
+    arch_interrupt_enable( old );
+    return ret;
+}
+
+static int __mutex_raise_owner_priority( mutex_t *semid, tcb_t *powner, int priority )
+{
+    int ret = 0;
+    
+again:
+    if ( __resort_hold_mutex_list_and_trig(semid, powner) ) {
+        if ( powner->current_priority > priority ) {
+            powner->current_priority = priority;
+            ret++;
+            if ( powner->status == TASK_READY ) {
+                READY_Q_REMOVE( powner );
+                READY_Q_PUT( powner, priority );
+            } else if ( powner->status & TASK_SUSPEND ) {
+                semid   = (mutex_t*)PLIST_PTR_TO_SEMID( powner->psem_list );
+                if ( __resort_pend_list_and_trig( (semaphore_t*)semid, powner ) &&
+                     (semid->s.type == SEM_TYPE_MUTEX) ) {
+                    powner = semid->s.u.owner;
+                    goto again;
                 }
             }
-        } /* if ( __resort_ ... */
+        }
+    }
+    return ret;
+}
+
+static void __mutex_priority_inheritance( mutex_t *semid )
+{
+    tcb_t *powner;
+    
+    powner   = semid->s.u.owner;
+    
+    if ( __insert_pend_list_and_trig( (semaphore_t*)semid, ptcb_current ) ) {
+        __mutex_raise_owner_priority( semid, powner, ptcb_current->current_priority );
     }
 }
 
-static void __restore_current_task_priority ( semaphore_t *semid )
+static void __restore_current_task_priority ( mutex_t *semid )
 {
     int priority;
 
@@ -831,6 +921,7 @@ static void task_exit( void )
     
     arch_interrupt_disable();
     READY_Q_REMOVE( ptcb_current );
+    /* softtimer_remove( &ptcb_current->tick_node ); */
     list_del_init( &ptcb_current->task_list_node );
     schedule_internel();
     /*
@@ -857,7 +948,7 @@ int task_stop_remove( tcb_t *ptcb )
     }
     
     list_for_each_safe(p, save, &ptcb->mutex_holded_head){
-        semaphore_t *psemid;
+        mutex_t *psemid;
         psemid = SEM_MEMBER_PTR_TO_SEMID( p );
         __release_one_mutex( psemid );
     }
@@ -865,7 +956,8 @@ int task_stop_remove( tcb_t *ptcb )
     READY_Q_REMOVE( ptcb );
     list_del_init( &ptcb->task_list_node );
     ptcb->status = TASK_DEAD;
-    
+    schedule_internel();
+		
   done:
     arch_interrupt_enable(old );
     return ret;
@@ -908,9 +1000,6 @@ void task_init(tcb_t      *ptcb,
                void       *arg1, /* 1st of 10 req'd args to pass to entryPt */
                void       *arg2)
 {
-    int len = strlen(name) + 1;
-    char *p;
-
     ptcb->priority         = priority;
     ptcb->current_priority = priority;
     ptcb->status           = TASK_READY;
@@ -919,18 +1008,7 @@ void task_init(tcb_t      *ptcb,
     ptcb->stack_low        = stack_low;
     ptcb->stack_high       = stack_high;
     ptcb->safe_count       = 0;
-
-    /*
-     *  setting stack name
-     */
-    p = --stack_high - len;
-    stack_high = p - 1;
-    if ( p <= stack_low ) {
-        return;
-    }
-    ptcb->name = p;
-    while ( (*(p++) = *name++) ){
-    }
+    ptcb->name = name;
 
     ptcb->sp = arch_stack_init( pfunc, arg1, arg2, stack_low, stack_high, task_exit );
     INIT_LIST_HEAD( &ptcb->prio_node.node );
@@ -952,9 +1030,9 @@ int task_unsafe( void )
 
 static void schedule_internel( void )
 {
-	tcb_t *p;
+    tcb_t *p;
 
-	p = highest_tcb_get();
+    p = highest_tcb_get();
     if ( p != ptcb_current) {
         if (IS_INT_CONTEXT()) {
             arch_context_switch_interrupt( &ptcb_current->sp, &p->sp);
@@ -974,23 +1052,23 @@ void set_ptcb_current( void **pp )
 
 void schedule( void )
 {
-	int old;
-	tcb_t *p;
+    int old;
+    tcb_t *p;
 
     old = arch_interrupt_disable();
     if ( IS_INT_CONTEXT() ) {
         goto done;
     }
     
-	p = highest_tcb_get();
-	if ( p != ptcb_current ){
+    p = highest_tcb_get();
+    if ( p != ptcb_current ){
         if (IS_INT_CONTEXT()) {
             arch_context_switch_interrupt( &ptcb_current->sp, &p->sp);
         } else {
             arch_context_switch( &ptcb_current->sp, &p->sp);        
         }
-	}
-done:
+    }
+  done:
     arch_interrupt_enable(old);
 }
 
@@ -998,14 +1076,14 @@ static void task_idle( void *arg )
 {
     task_safe();
     while (1) {
-    	schedule();
+        schedule();
     }
 }
 
 void kernel_init( void )
 {
-	TASK_INFO_DECL(static, info1, 512);
-	
+    static TASK_INFO_DECL(info1, 128+8);
+    
     INIT_LIST_HEAD( &GlistAllTaskListHead );
     INIT_LIST_HEAD(&GlistDelayHead);
     priority_q_init( &g_readyq );
@@ -1019,12 +1097,10 @@ unsigned int tick_get( void )
 }
 
 
-int msgq_init( msgq_t *pmsgq, int objsize, int unit_size )
+int msgq_init( msgq_t *pmsgq, void *buff, int buffer_size, int unit_size )
 {
-    int     buffer_size;
     int     count;
 
-    buffer_size = objsize - sizeof(msgq_t);
     count = buffer_size / unit_size;
     
     if ( buffer_size == 0 || count == 0 ) {
@@ -1036,6 +1112,7 @@ int msgq_init( msgq_t *pmsgq, int objsize, int unit_size )
     pmsgq->wr        = 0;
     pmsgq->unit_size = unit_size;
     pmsgq->count     = count;
+    pmsgq->buff      = buff;
 
     sem_counter_init( &pmsgq->sem_rd,  0 );
     sem_counter_init( &pmsgq->sem_wr,  count );

@@ -33,9 +33,9 @@ Makefile:;
 include $(RTK_BASE)/makefiles/config.mk
 
 #编译到$(MODULE_NAME)的目标文件
-COBJS   := $(patsubst %.c,%.o,$(wildcard *.c)) 
-CPPOBJS := $(patsubst %.cpp,%.o,$(wildcard *.cpp)) 
-SOBJS   := $(patsubst %.S,%.o,$(wildcard *.S))
+COBJS   := $(ARMARCH)_context.o
+CPPOBJS := 
+SOBJS   := $(ARMARCH)_context_gcc.o
 
 # 本目录编译后打到的库名字，在安装Makefile时自动生成。
 #<<tree.cfg

@@ -1,5 +1,5 @@
 
-#include "os.h"
+#include "rtk.h"
 #include "stm32f10x.h"
 #include "stm32f10x_rcc.h"
 #include "stm32f10x_gpio.h"
@@ -8,8 +8,8 @@
 
 #define RT_USING_UART1
 
-static MSGQ_DECL_NO_INIT(uart_msgq_rx, 128 );
-static MSGQ_DECL_NO_INIT(uart_msgq_tx, 64 );
+MSGQ_DECL_NO_INIT(static, uart_msgq_rx, 128 );
+MSGQ_DECL_NO_INIT(static, uart_msgq_tx, 64 );
 
 int uart_get_char( char *pc, int tick );
 int uart_putchar( char c );
@@ -94,7 +94,7 @@ void uart_test_rxtx( void )
 
 void test_uart_isr_init( void )
 {
-    TASK_INFO_DECL(static, info_1, 256);
+    static TASK_INFO_DECL(info_1, 256);
 
     
     TASK_INIT( "u",  info_1,   5, uart_test_rxtx,  0, 0 );

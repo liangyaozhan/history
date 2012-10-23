@@ -1,8 +1,8 @@
 
 /**
- * Last modified Time-stamp: <2012-10-21 09:30:08 Sunday by lyzh>
+ * Last modified Time-stamp: <2012-10-23 19:06:20 Tuesday by lyzh>
  *
- * @file    os.h
+ * @file    rtk.h
  * @author  liangyaozhan @2012-10-14
  * @version 0.1.0
  * @brief   ppos header file
@@ -14,6 +14,7 @@
 
 #include <stdint.h>
 #include "list.h"
+#include "rtk_config.h"
 
 /**
  *  @addtogroup kernel
@@ -29,7 +30,7 @@
  *  @name priority_number_configuration
  *  @{
  */
-#define MAX_PRIORITY            8  /*!< must be <= 256 and >=1 */
+/*#define MAX_PRIORITY            8  *//*!< must be <= 256 and >=1 */
 /**
  *  @}
  */
@@ -37,8 +38,8 @@
 /**
  *  @brief optimize macro
  */
-#define likely(x)	__builtin_expect(!!(x), 1)  /*!< likely optimize macro      */
-#define unlikely(x)	__builtin_expect(!!(x), 0)  /*!< unlikely optimize macro    */
+#define likely(x)    __builtin_expect(!!(x), 1)  /*!< likely optimize macro      */
+#define unlikely(x)    __builtin_expect(!!(x), 0)  /*!< unlikely optimize macro    */
 
 /**
  *  @brief ROUND DOWN and UP
@@ -104,7 +105,7 @@ typedef struct __tcb_t tcb_t;
 struct __tcb_t
 {
     void             *sp;                   /*!< stack pointor          */
-    char             *name;                 /*!< task's name            */
+    const char       *name;                 /*!< task's name            */
     char             *stack_low;            /*!< stack low pointor      */
     char             *stack_high;           /*!< stack high pointor     */
     int               option;               /*!< for the further        */
@@ -129,16 +130,25 @@ struct __tcb_t
  */
 struct __semaphore_t
 {
-	union {
-		struct __tcb_t     *owner; /*!< owner when it is mutex              */
-		unsigned int        count; /*!< counter when it is semB or sem C    */
-	}u;
-	int                     type;                   /*!< Specifies the type of semaphore     */
-	int                     mutex_recurse_count;    /*!< only used when it is mutex          */
-	struct list_head        pending_tasks;          /*!< the pending tasks link list head    */
-	struct list_head        sem_member_node;        /*!< only used when it is mutex          */
+    union {
+        struct __tcb_t     *owner; /*!< owner when it is mutex              */
+        unsigned int        count; /*!< counter when it is semB or sem C    */
+    }u;
+    struct list_head        pending_tasks;          /*!< the pending tasks link list head    */
+    unsigned char           type;                   /*!< Specifies the type of semaphore     */
 };
 typedef struct __semaphore_t semaphore_t;
+
+/**
+ *  @brief mutex struct
+ */
+struct __mutex_t
+{
+    semaphore_t             s;
+    struct list_head        sem_member_node;        /*!< only used when it is mutex          */
+    int                     mutex_recurse_count;    /*!< only used when it is mutex          */
+};
+typedef struct __mutex_t mutex_t;
 
 
 /**
@@ -155,7 +165,7 @@ struct __msgq_t
     int         unit_size;      /*!< element size            */
     int         rd;             /*!< read pointor            */
     int         wr;             /*!< write pointor           */
-    char        buff[1];        /*!< dynamic allocated       */
+    char       *buff;        /*!< dynamic allocated       */
 };
 typedef struct __msgq_t msgq_t;
 
@@ -191,9 +201,9 @@ typedef struct __msgq_t msgq_t;
  *  @defgroup semaphore_type
  *  @{
  */
-#define SEM_TYPE_BINARY 0x01    /*!< semaphore type: binary  */
-#define SEM_TYPE_COUNT  0x02    /*!< semaphore type: counter */
-#define SEM_TYPE_MUTEX  0x03    /*!< semaphore type: mutex   */
+#define SEM_TYPE_BINARY     0x01    /*!< semaphore type: binary  */
+#define SEM_TYPE_COUNTER    0x02    /*!< semaphore type: counter */
+#define SEM_TYPE_MUTEX      0x03    /*!< semaphore type: mutex   */
 /**
  *  @}
  */
@@ -203,10 +213,21 @@ typedef struct __msgq_t msgq_t;
 
 
 /**
- *  @name wait forever
+ *  @name waitforever
  *  @{
  */
 #define WAIT_FOREVER    ((unsigned int)0xffffffff)
+/**
+ *  @}
+ */
+
+/**
+ *  @name namespace
+ *  @{
+ */
+#define GLOBAL          /*!< global name space used for MSGQ_DECL_xxx...    */
+#define IMPORT  extern  /*!< import name space used for MSGQ_DECL_xxx...    */
+#define LOCAL   static  /*!< static name space used for MSGQ_DECL_xxx...    */
 /**
  *  @}
  */
@@ -244,8 +265,8 @@ typedef struct __msgq_t msgq_t;
  *      arch_interrupt_disable();
  *      kernel_init();
  *      
- *      TASK_INIT( "ta", info1, priority1, 0, func, "task a p1","task a p2" );
- *      TASK_INIT( "tb", info2, priority2, 0, func, "task b p1","task b p2" );
+ *      TASK_INIT( "ta", info1, priority1, func, "task a p1","task a p2" );
+ *      TASK_INIT( "tb", info2, priority2, func, "task b p1","task b p2" );
  *      TASK_STARTUP(info1);
  *      TASK_STARTUP(info2);
  *      os_startup();
@@ -253,21 +274,20 @@ typedef struct __msgq_t msgq_t;
  *  }
  *  @endcode
  */
-#define TASK_INFO_DECL(namespace, info, stack_size)  namespace char stack_##info[stack_size]; \
-    namespace tcb_t tcb_##info
+#define TASK_INFO_DECL(info, stack_size)  struct __taskinfo_##info {tcb_t tcb; char stack[stack_size]; }info
 /**
  *  @brief init task infomation
  *
  *  infomation value 'info' is from TASK_INFO_DECL().
  */
 #define TASK_INIT(name, info, priority, func, arg1, arg2)               \
-    task_init( &tcb_##info, (name), (priority), 0, stack_##info, stack_##info+sizeof(stack_##info), func, (arg1), (arg2) )
+    task_init( &info.tcb, (name), (priority), 0, info.stack, info.stack+sizeof(info.stack), func, (arg1), (arg2) )
 /**
  *  @brief task startup macro.
  *
  *  infomation value 'info' is from TASK_INFO_DECL().
  */
-#define TASK_STARTUP(info)  task_startup( &tcb_##info )
+#define TASK_STARTUP(info)  task_startup( &info.tcb )
 
 /**
  * @brief kernel initialize
@@ -360,7 +380,7 @@ int task_unsafe( void );
  *  @code
  *  semaphore_t semb;
  *  semaphore_t semc;
- *  semaphore_t mutex;
+ *  mutex_t mutex;
  *  void do_init( void ) {
  *      sem_counter_init( &semc, init_count );
  *      sem_binary_init( &semb, init_count ); /@ 0 or 1 @/
@@ -379,13 +399,11 @@ int task_unsafe( void );
  *  }
  *  @endcode
  */
-#define SEM_DECL( sem, t, init)                                         \
-	semaphore_t sem = {                                                 \
-		.u.count = init,                                                \
-        .type=t,                                                        \
-		.mutex_recurse_count = 0,                                       \
-		.pending_tasks = LIST_HEAD_INIT(sem.pending_tasks),             \
-		.sem_member_node = LIST_HEAD_INIT(sem.sem_member_node),         \
+#define SEM_DECL( sem, t, init)                 \
+	semaphore_t sem = {                         \
+		{init},                                 \
+		LIST_HEAD_INIT(sem.pending_tasks),      \
+        t,                                      \
 	}
 
 /**
@@ -396,13 +414,21 @@ int task_unsafe( void );
 /**
  *  @brief semaphore counter declaration macro.
  */
-#define SEM_COUNT_DECL(name, init_value)    SEM_DECL(name, SEM_TYPE_COUNT, init_value)
+#define SEM_COUNT_DECL(name, init_value)    SEM_DECL(name, SEM_TYPE_COUNTER, init_value)
 
 /**
  *  @brief mutex declaration macro.
  */
-#define MUTEX_DECL(mutex)                   SEM_DECL(mutex, SEM_TYPE_MUTEX, 0)
-
+#define MUTEX_DECL(var)                                  \
+    mutex_t var={                                        \
+        {                                                \
+            {0}, LIST_HEAD_INIT((var).s.pending_tasks),  \
+            SEM_TYPE_MUTEX,                              \
+        },                                               \
+        LIST_HEAD_INIT((var).sem_member_node),           \
+        0,                                               \
+    }
+    
 /**
  *  @brief semaphore counter initialize
  *
@@ -472,7 +498,7 @@ int  sem_binary_give( semaphore_t *semid );
  *  @return 0           OK.
  *  @return -1          FAILED.
  */
-int  mutex_init( semaphore_t *semid );
+int  mutex_init( mutex_t *semid );
 
 /**
  *  @brief mutex lock
@@ -484,7 +510,7 @@ int  mutex_init( semaphore_t *semid );
  *  @return 0           OK.
  *  @return -1          FAILED.
  */
-int  mutex_lock( semaphore_t *semid, unsigned int tick );
+int  mutex_lock( mutex_t *semid, unsigned int tick );
 
 /**
  *  @brief mutex unlock
@@ -493,7 +519,7 @@ int  mutex_lock( semaphore_t *semid, unsigned int tick );
  *  @return 0           OK.
  *  @return -1          FAILED.
  */
-int  mutex_unlock( semaphore_t *semid );
+int  mutex_unlock( mutex_t *semid );
 /**
  *  @}
  */
@@ -532,30 +558,21 @@ int  mutex_unlock( semaphore_t *semid );
  */
 
 #define MSGQ_DECL_INIT(name, unitsize, cnt)                             \
-    struct __msgq__t##name {                                            \
-        msgq_t msgq;char buff[(unitsize)*(cnt)];                        \
-    } name = {                                                          \
-        .msgq = {                                                       \
-            .sem_rd = {                                                 \
-                .u.count = 0,                                           \
-                .type = SEM_TYPE_COUNT,                                 \
-                .mutex_recurse_count = 0,                               \
-                .pending_tasks = LIST_HEAD_INIT((name).msgq.sem_rd.pending_tasks), \
-                .sem_member_node = LIST_HEAD_INIT((name).msgq.sem_rd.sem_member_node), \
-            },                                                          \
-            .sem_wr = {                                                 \
-                .u.count = cnt,                                         \
-                .type = SEM_TYPE_COUNT,                                 \
-                .mutex_recurse_count = 0,                               \
-                .pending_tasks = LIST_HEAD_INIT((name).msgq.sem_wr.pending_tasks), \
-                .sem_member_node = LIST_HEAD_INIT((name).msgq.sem_wr.sem_member_node), \
-            },                                                          \
-            .buff_size = sizeof((name).buff),                           \
-            .count = cnt,                                               \
-            .unit_size = unitsize,                                      \
-            .rd = 0,                                                    \
-            .wr = 0,                                                    \
-        },                                                              \
+    namespace char __msgqbuff##name[(unitsize)*(cnt)];                  \
+    namespace msgq_t name = {                                           \
+        /* .sem_rd = , */                                               \
+        { {0}, LIST_HEAD_INIT(sem.pending_tasks),SEM_TYPE_COUNTER, },   \
+        /* .sem_wr = , */                                               \
+        { {cnt},LIST_HEAD_INIT(sem.pending_tasks), SEM_TYPE_COUNTER,},  \
+        /* .buff_size = sizeof((name).buff),  */                        \
+        /* .count = cnt, */                                             \
+        /* .unit_size = unitsize, */                                    \
+        (unitsize)*(cnt),cnt,unitsize                                   \
+        /* .rd = 0, */                                                  \
+        /* .wr = 0, */                                                  \
+        0,0,                                                            \
+        /* buff*/                                                       \
+        __msgqbuff##name,                                               \
     }
 
 /**
@@ -566,14 +583,14 @@ int  mutex_unlock( semaphore_t *semid );
  *  @par example  
  *  @code
  *  
- *  MSGQ_DECL_NO_INIT( mymsgq, sizeof(int)*10 );
+ *  MSGQ_DECL_NO_INIT( static, mymsgq, sizeof(int)*10 );
  *  int func_init( void )
  *  {
  *      return MSGQ_DO_INIT( mymsgq, sizeof(int) );
  *  }
  *  int func_send( int *buff )
  *  {
- *      return msgq_send( (msgq_t*)&mymsgq, buff, sizeof(int), 1000 );
+ *      return msgq_send( &mymsgq, buff, sizeof(int), 1000 );
  *  }
  *  int func_recieve( int *buff )
  *  {
@@ -581,11 +598,10 @@ int  mutex_unlock( semaphore_t *semid );
  *  }
  *  @endcode
  */
-#define MSGQ_DECL_NO_INIT(name, buffersize )    \
-    struct __msgq__t##name {                    \
-        msgq_t msgq;char buff[buffersize];      \
-    } name
-#define MSGQ_DO_INIT(name, unitsize)  msgq_init(&name.msgq, sizeof(name), unitsize)
+#define MSGQ_DECL_NO_INIT(namespace, name, buffersize )                 \
+    namespace char __msgqbuff##name[buffersize];                        \
+    namespace msgq_t name
+#define MSGQ_DO_INIT(name, unitsize)  msgq_init( &name, __msgqbuff##name, sizeof(__msgqbuff##name), unitsize)
 
 /**
  *  @brief usage of msgq_init()
@@ -597,16 +613,14 @@ int  mutex_unlock( semaphore_t *semid );
  *      struct _yourbase_type {
  *          int a;int b;
  *      };
- *      struct _yourtype_t {
- *          msgq_t msgq;
- *          char buffer[M];
- *      }msgq_var;
+ *      char buffer[M];
+ *      msgq_t msgq_var;
  *      void func_init( void ){
- *          msgq_init( &msgq_var.msgq, sizeof(msgq_var), sizeof(struct _yourbase_type));
+ *          msgq_init( &msgq_var, buffer, sizeof(buffer), (struct _yourbase_type));
  *      }
  *  @endcode
  */
-int msgq_init( msgq_t *pmsgq, int objsize, int unit_size );
+int msgq_init( msgq_t *pmsgq, void *buff, int buffer_size, int unit_size );
 
 /**
  *  @brief recieve msg from a msgQ
