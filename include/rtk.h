@@ -1,6 +1,6 @@
 
 /**
- * Last modified Time-stamp: <2012-10-23 19:06:20 Tuesday by lyzh>
+ * Last modified Time-stamp: <2012-10-24 19:19:45 Wednesday by lyzh>
  *
  * @file    rtk.h
  * @author  liangyaozhan @2012-10-14
@@ -131,8 +131,8 @@ struct __tcb_t
 struct __semaphore_t
 {
     union {
-        struct __tcb_t     *owner; /*!< owner when it is mutex              */
         unsigned int        count; /*!< counter when it is semB or sem C    */
+        struct __tcb_t     *owner; /*!< owner when it is mutex              */
     }u;
     struct list_head        pending_tasks;          /*!< the pending tasks link list head    */
     unsigned char           type;                   /*!< Specifies the type of semaphore     */
@@ -183,8 +183,8 @@ typedef struct __msgq_t msgq_t;
  *  @{
  */
 #define TASK_READY              0x00
-#define TASK_SUSPEND            0x01
-#define TASK_DELAYD             0x02
+#define TASK_PENDING            0x01
+#define TASK_DELAY              0x02
 #define TASK_DEAD               0x04
 /**
  *  @}
@@ -274,7 +274,7 @@ typedef struct __msgq_t msgq_t;
  *  }
  *  @endcode
  */
-#define TASK_INFO_DECL(info, stack_size)  struct __taskinfo_##info {tcb_t tcb; char stack[stack_size]; }info
+#define TASK_INFO_DECL(zone, info, stack_size) zone struct __taskinfo_##info {tcb_t tcb; char stack[stack_size]; }info
 /**
  *  @brief init task infomation
  *
@@ -340,11 +340,19 @@ int task_startup( tcb_t *ptcb );
 void os_startup( void );
 
 /**
+ *  @brief stop a task and deinitialize.
+ *
+ *  the task may be running or pending.
+ */
+int task_stop_deinit( tcb_t *ptcb );
+
+/**
  *  @brief task delay
  *
  *  delay tick.
  */
 void task_delay( int tick );
+unsigned int tick_get( void );
 
 int task_safe( void );
 int task_unsafe( void );
@@ -400,7 +408,7 @@ int task_unsafe( void );
  *  @endcode
  */
 #define SEM_DECL( sem, t, init)                 \
-	semaphore_t sem = {                         \
+	semaphore_t sem; semaphore_t sem = {                         \
 		{init},                                 \
 		LIST_HEAD_INIT(sem.pending_tasks),      \
         t,                                      \
@@ -409,18 +417,18 @@ int task_unsafe( void );
 /**
  *  @brief semaphore binary declaration macro.
  */
-#define SEM_BINARY_DECL(name, init_value)   SEM_DECL(name, SEM_TYPE_BINARY, init_value)
+#define SEM_BINARY_DECL(zone, name, init_value)  zone SEM_DECL(name, SEM_TYPE_BINARY, init_value)
 
 /**
  *  @brief semaphore counter declaration macro.
  */
-#define SEM_COUNT_DECL(name, init_value)    SEM_DECL(name, SEM_TYPE_COUNTER, init_value)
+#define SEM_COUNT_DECL(zone, name, init_value)   zone SEM_DECL(name, SEM_TYPE_COUNTER, init_value)
 
 /**
  *  @brief mutex declaration macro.
  */
-#define MUTEX_DECL(var)                                  \
-    mutex_t var={                                        \
+#define MUTEX_DECL(zone, var)                                  \
+    zone mutex_t var={                                        \
         {                                                \
             {0}, LIST_HEAD_INIT((var).s.pending_tasks),  \
             SEM_TYPE_MUTEX,                              \
@@ -440,6 +448,11 @@ int task_unsafe( void );
 int  sem_counter_init( semaphore_t *semid, int InitCount );
 
 /**
+ *  @brief semaphore counter deinitialize
+ */
+int  sem_counter_deinit( semaphore_t*semid );
+
+/**
  *  @brief semaphore binary initialize
  *
  *  @param  semid       semaphore binary piontor.
@@ -448,6 +461,11 @@ int  sem_counter_init( semaphore_t *semid, int InitCount );
  *  @return -1          FAILED.
  */
 int  sem_binary_init( semaphore_t *semid, int InitCount );
+
+/**
+ *  @brief semaphore binary deinitialize
+ */
+int  sem_binary_deinit( semaphore_t*semid );
 
 /**
  *  @brief semaphore counter take
@@ -520,6 +538,12 @@ int  mutex_lock( mutex_t *semid, unsigned int tick );
  *  @return -1          FAILED.
  */
 int  mutex_unlock( mutex_t *semid );
+
+/**
+ *  @brief mutex deinitialize
+ *  
+ */
+int mutex_deinit( mutex_t *mutex );
 /**
  *  @}
  */
@@ -557,17 +581,17 @@ int  mutex_unlock( mutex_t *semid );
  *  @endcode
  */
 
-#define MSGQ_DECL_INIT(name, unitsize, cnt)                             \
-    namespace char __msgqbuff##name[(unitsize)*(cnt)];                  \
-    namespace msgq_t name = {                                           \
+#define MSGQ_DECL_INIT(zone, name, unitsize, cnt)                             \
+    zone char __msgqbuff##name[(unitsize)*(cnt)];                  \
+    zone msgq_t name; msgq_t name = {                                           \
         /* .sem_rd = , */                                               \
-        { {0}, LIST_HEAD_INIT(sem.pending_tasks),SEM_TYPE_COUNTER, },   \
+        {{0,}, LIST_HEAD_INIT((name.sem_rd.pending_tasks)),  SEM_TYPE_COUNTER},    \
         /* .sem_wr = , */                                               \
-        { {cnt},LIST_HEAD_INIT(sem.pending_tasks), SEM_TYPE_COUNTER,},  \
+        {{cnt,},LIST_HEAD_INIT((name.sem_wr.pending_tasks)), SEM_TYPE_COUNTER},  \
         /* .buff_size = sizeof((name).buff),  */                        \
         /* .count = cnt, */                                             \
         /* .unit_size = unitsize, */                                    \
-        (unitsize)*(cnt),cnt,unitsize                                   \
+        (unitsize)*(cnt),cnt,unitsize,                                  \
         /* .rd = 0, */                                                  \
         /* .wr = 0, */                                                  \
         0,0,                                                            \
@@ -684,7 +708,7 @@ extern void schedule(void);
  *
  * internal used currently
  */
-extern struct list_head  GlistAllTaskListHead;
+extern struct list_head g_systerm_tasks_head;
 /**
  * @brief pontor of current task control bock.
  *

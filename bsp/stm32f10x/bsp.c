@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-10-23 18:57:23 Tuesday by lyzh>
+/* Last modified Time-stamp: <2012-10-24 21:43:34 Wednesday by lyzh>
  * @(#)bsp.c
  */
 
@@ -29,3 +29,9 @@ void SysTick_Handler(void)
 	EXIT_INT_CONTEXT();
 }
 
+void assert_failed(uint8_t* file, uint32_t line)
+{
+    kprintf ("assert_failed at %s:%d\n", file, line );
+    ptcb_current->safe_count = 0;
+    task_stop_remove( ptcb_current );
+}

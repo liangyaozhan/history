@@ -94,7 +94,7 @@ void uart_test_rxtx( void )
 
 void test_uart_isr_init( void )
 {
-    static TASK_INFO_DECL(info_1, 256);
+    TASK_INFO_DECL(static, info_1, 256);
 
     
     TASK_INIT( "u",  info_1,   5, uart_test_rxtx,  0, 0 );

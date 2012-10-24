@@ -103,11 +103,11 @@ void main_task( void *pa, void *pb)
 
 int main()
 {
-	static TASK_INFO_DECL(info_uart1, 512*2);
-	static TASK_INFO_DECL(info_uart2, 512*2);
-    static TASK_INFO_DECL(info_led,   512*2);
-    static TASK_INFO_DECL(info_led1,   512*2);
-	static TASK_INFO_DECL(info_root,  1024);
+	TASK_INFO_DECL(static, info_uart1, 512*2);
+	TASK_INFO_DECL(static, info_uart2, 512*2);
+    TASK_INFO_DECL(static, info_led,   512*2);
+    TASK_INFO_DECL(static, info_led1,   512*2);
+	TASK_INFO_DECL(static, info_root,  1024);
     
     arch_interrupt_disable();
 
@@ -130,16 +130,6 @@ int main()
 	os_startup();
     return 0;
 }
-
-void assert_failed(uint8_t* file, uint32_t line)
-{
-    kprintf ("assert_failed at %s:%d\n", file, line );
-	while (9) {
-
-	}
-}
-
-
 
 #define led1_rcc                    RCC_APB2Periph_GPIOA
 #define led1_gpio                   GPIOA

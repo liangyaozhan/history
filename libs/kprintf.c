@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-10-23 19:04:01 Tuesday by lyzh>
+/* Last modified Time-stamp: <2012-10-24 19:02:13 Wednesday by lyzh>
  * @(#)kprintf.c
  */
 
@@ -21,7 +21,7 @@ int serial_puts(const char *str);
 #endif
 
 
-static MUTEX_DECL(kprintf_mutex);
+MUTEX_DECL(static, kprintf_mutex);
 
 int kprintf( const char* str, ... )
 {
