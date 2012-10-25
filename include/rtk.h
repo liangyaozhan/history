@@ -1,13 +1,23 @@
-
-/**
- * Last modified Time-stamp: <2012-10-24 19:19:45 Wednesday by lyzh>
+/* Last modified Time-stamp: <2012-10-26 05:59:03 Friday by lyzh>
+ * 
+ * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
+ * 
  *
- * @file    rtk.h
- * @author  liangyaozhan @2012-10-14
- * @version 0.1.0
- * @brief   ppos header file
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or (at
+ * your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, GOOD TITLE or
+ * NON INFRINGEMENT.  See the GNU General Public License for more
+ * details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
 
 #ifndef __TCB_H
 #define __TCB_H
