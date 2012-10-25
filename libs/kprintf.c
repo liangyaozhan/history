@@ -32,7 +32,7 @@ int kprintf( const char* str, ... )
     int i, w,res, cc;
 
     if ( !IS_INT_CONTEXT() ) {
-        mutex_lock( &kprintf_mutex, -1);
+        mutex_lock( &kprintf_mutex, WAIT_FOREVER);
     }
     
     

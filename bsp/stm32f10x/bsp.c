@@ -4,15 +4,11 @@
 
 #include "rtk.h"
 
-#define RT_USING_UART1
-
-
 #include "stm32f10x.h"
 #include "stm32f10x_rcc.h"
 #include "stm32f10x_gpio.h"
 #include "stm32f10x_usart.h"
 #include "misc.h"
-
 
 int os_clk_init( void )
 {
@@ -33,5 +29,5 @@ void assert_failed(uint8_t* file, uint32_t line)
 {
     kprintf ("assert_failed at %s:%d\n", file, line );
     ptcb_current->safe_count = 0;
-    task_stop_remove( ptcb_current );
+    task_terminate( ptcb_current );
 }

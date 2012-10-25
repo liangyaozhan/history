@@ -329,7 +329,7 @@ void task_init(tcb_t      *ptcb,
  *  add a task to running queue.
  */
 int task_startup( tcb_t *ptcb );
-
+int task_priority_set( tcb_t *ptcb, int priority );
 /**
  *  @brief starting up operating system.
  *
@@ -344,7 +344,7 @@ void os_startup( void );
  *
  *  the task may be running or pending.
  */
-int task_stop_deinit( tcb_t *ptcb );
+int task_terminate( tcb_t *ptcb );
 
 /**
  *  @brief task delay
@@ -390,15 +390,15 @@ int task_unsafe( void );
  *  semaphore_t semc;
  *  mutex_t mutex;
  *  void do_init( void ) {
- *      sem_counter_init( &semc, init_count );
- *      sem_binary_init( &semb, init_count ); /@ 0 or 1 @/
+ *      semc_init( &semc, init_count );
+ *      semb_init( &semb, init_count ); /@ 0 or 1 @/
  *      mutex_init( &mutex );
  *  }
  *  
  *  void use_it( void ) {
- *      sem_counter_take( &semc, tick );
+ *      semc_take( &semc, tick );
  *      ...
- *      sem_binary_take( &semb, tick );
+ *      semb_take( &semb, tick );
  *      ...
  *      mutex_lock( &mutex );
  *      ...
@@ -445,12 +445,12 @@ int task_unsafe( void );
  *  @return 0           OK.
  *  @return -1          FAILED.
  */
-int  sem_counter_init( semaphore_t *semid, int InitCount );
+int  semc_init( semaphore_t *semid, int InitCount );
 
 /**
  *  @brief semaphore counter deinitialize
  */
-int  sem_counter_deinit( semaphore_t*semid );
+int  semc_terminate( semaphore_t*semid );
 
 /**
  *  @brief semaphore binary initialize
@@ -460,12 +460,12 @@ int  sem_counter_deinit( semaphore_t*semid );
  *  @return 0           OK.
  *  @return -1          FAILED.
  */
-int  sem_binary_init( semaphore_t *semid, int InitCount );
+int  semb_init( semaphore_t *semid, int InitCount );
 
 /**
  *  @brief semaphore binary deinitialize
  */
-int  sem_binary_deinit( semaphore_t*semid );
+int  semb_terminate( semaphore_t*semid );
 
 /**
  *  @brief semaphore counter take
@@ -477,7 +477,7 @@ int  sem_binary_deinit( semaphore_t*semid );
  *  @return 0           OK.
  *  @return -1          FAILED.
  */
-int  sem_counter_take( semaphore_t *semid, unsigned int tick );
+int  semc_take( semaphore_t *semid, unsigned int tick );
 
 /**
  *  @brief semaphore counter initialize
@@ -486,7 +486,7 @@ int  sem_counter_take( semaphore_t *semid, unsigned int tick );
  *  @return 0           OK.
  *  @return -1          FAILED.
  */
-int  sem_counter_give( semaphore_t *semid );
+int  semc_give( semaphore_t *semid );
 
 /**
  *  @brief semaphore counter initialize
@@ -498,7 +498,7 @@ int  sem_counter_give( semaphore_t *semid );
  *  @return 0           OK.
  *  @return -1          FAILED.
  */
-int  sem_binary_take( semaphore_t *semid, unsigned int tick );
+int  semb_take( semaphore_t *semid, unsigned int tick );
 
 /**
  *  @brief semaphore counter initialize
@@ -507,7 +507,7 @@ int  sem_binary_take( semaphore_t *semid, unsigned int tick );
  *  @return 0           OK.
  *  @return -1          FAILED.
  */
-int  sem_binary_give( semaphore_t *semid );
+int  semb_give( semaphore_t *semid );
 
 /**
  *  @brief mutex initialize
@@ -543,7 +543,7 @@ int  mutex_unlock( mutex_t *semid );
  *  @brief mutex deinitialize
  *  
  */
-int mutex_deinit( mutex_t *mutex );
+int mutex_terminate( mutex_t *mutex );
 /**
  *  @}
  */

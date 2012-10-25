@@ -65,7 +65,7 @@ EX_CLEAN_FILE +=
 # 可以写在当前目录的dircfg.mk
 # 
 
-#EXCLUDE_SUB_PATH:=
+EXCLUDE_SUB_PATH:=keil-example1
 
 # 如果可能，则包含当前目录下的配置文件
 -include ./dircfg.mk

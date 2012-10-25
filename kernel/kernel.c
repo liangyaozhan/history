@@ -56,7 +56,6 @@ static int                                  __mutex_owner_set( mutex_t *semid, t
 static inline int                           __get_pend_list_priority ( semaphore_t *semid );
 static inline int                           __get_mutex_hold_list_priority ( tcb_t *ptcb );
 static inline struct list_head             *__sem_pend_list_get_and_remove_first_node( semaphore_t *semid );
-static void                                 __mutex_priority_inheritance( mutex_t *semid );
 static void                                 __restore_current_task_priority( mutex_t *semid );
 static void                                 task_delay_timeout( softtimer_t *pdn );
 static void                                 priority_q_init( priority_q_bitmap_head_t *pqriHead );
@@ -291,7 +290,7 @@ static void __sem_init_common( semaphore_t *semid )
     INIT_LIST_HEAD( &semid->pending_tasks );
 }
 
-int sem_counter_init( semaphore_t *semid, int InitCount )
+int semc_init( semaphore_t *semid, int InitCount )
 {
     __sem_init_common( semid );
     semid->u.count = InitCount;
@@ -299,7 +298,7 @@ int sem_counter_init( semaphore_t *semid, int InitCount )
     return 0;
 }
 
-int sem_binary_init( semaphore_t *semid, int InitCount )
+int semb_init( semaphore_t *semid, int InitCount )
 {
     __sem_init_common( semid );
     semid->u.count = !!InitCount;
@@ -307,7 +306,7 @@ int sem_binary_init( semaphore_t *semid, int InitCount )
     return 0;
 }
 
-int sem_binary_clear( semaphore_t *semid )
+int semb_clear( semaphore_t *semid )
 {
     int old;
     
@@ -317,9 +316,9 @@ int sem_binary_clear( semaphore_t *semid )
     return 0;
 }
 
-int sem_counter_clear( semaphore_t *semid )
+int semc_clear( semaphore_t *semid )
 {
-    return sem_binary_clear(semid);
+    return semb_clear(semid);
 }
 
 int mutex_init( mutex_t *semid )
@@ -331,7 +330,7 @@ int mutex_init( mutex_t *semid )
     return 0;
 }
 
-static int __sem_deinit( semaphore_t *semid )
+static int __sem_terminate( semaphore_t *semid )
 {
     struct list_head *p;
     tcb_t            *ptcb_wakeup;
@@ -360,29 +359,29 @@ static int __sem_deinit( semaphore_t *semid )
     return happen;
 }
 
-int sem_binary_deinit( semaphore_t *semid )
+int semb_terminate( semaphore_t *semid )
 {
-    return __sem_deinit(semid);
+    return __sem_terminate(semid);
 }
 
-int sem_counter_deinit( semaphore_t *semid )
+int semc_terminate( semaphore_t *semid )
 {
-    return __sem_deinit(semid);
+    return __sem_terminate(semid);
 }
 
-int mutex_deinit( mutex_t *semid )
+int mutex_terminate( mutex_t *semid )
 {
     int old;
 
     old = arch_interrupt_disable();
     __mutex_owner_set( semid, NULL );
-    __sem_deinit( (semaphore_t*)semid );
+    __sem_terminate( (semaphore_t*)semid );
     arch_interrupt_enable( old );
-    return 0;
+	  return 0;
 }
 
 
-int sem_binary_take( semaphore_t *semid, unsigned int tick )
+int semb_take( semaphore_t *semid, unsigned int tick )
 {
     int old;
     int TaskStatus = 0;
@@ -470,7 +469,7 @@ err_done:
     return -ptcb_current->err;
 }
 
-int sem_counter_take( semaphore_t *semid, unsigned int tick )
+int semc_take( semaphore_t *semid, unsigned int tick )
 {
     int old;
     int TaskStatus = 0;
@@ -695,11 +694,11 @@ static void __release_one_mutex( mutex_t *semid )
     __mutex_owner_set( semid, NULL );
 }
 
-int sem_binary_give( semaphore_t *semid )
+int semb_give( semaphore_t *semid )
 {
     struct list_head *p;
-    tcb_t            *ptcbWakeup; /*  the task to wake up         */
-    int               old;
+    tcb_t *ptcbWakeup;                                                   /*  the task to wake up         */
+    int old;
 
 #ifndef KERNEL_NO_ARG_CHECK
     if ( unlikely(semid->type != SEM_TYPE_BINARY) ) {
@@ -725,7 +724,7 @@ int sem_binary_give( semaphore_t *semid )
     return 0;
 }
 
-int sem_counter_give( semaphore_t *semid )
+int semc_give( semaphore_t *semid )
 {
     struct list_head *p;
     tcb_t            *ptcbWakeup; /*  the task to wake up         */
@@ -1045,12 +1044,6 @@ again:
     return ret;
 }
 
-static void __mutex_priority_inheritance( mutex_t *semid )
-{
-    
-    
-}
-
 static void __restore_current_task_priority ( mutex_t *semid )
 {
     int priority;
@@ -1087,7 +1080,7 @@ static void task_exit( void )
 }
 
 
-int task_stop_remove( tcb_t *ptcb )
+int task_terminate( tcb_t *ptcb )
 {
     int old;
     int ret = 0;
@@ -1272,8 +1265,8 @@ int msgq_init( msgq_t *pmsgq, void *buff, int buffer_size, int unit_size )
     pmsgq->count     = count;
     pmsgq->buff      = buff;
 
-    sem_counter_init( &pmsgq->sem_rd,  0 );
-    sem_counter_init( &pmsgq->sem_wr,  count );
+    semc_init( &pmsgq->sem_rd,  0 );
+    semc_init( &pmsgq->sem_wr,  count );
 
     return 0;
 }
@@ -1300,7 +1293,7 @@ int msgq_recieve( msgq_t *pmsgq, void *buff, int buff_size, int tick, int keep )
     int old;
 
     old = arch_interrupt_disable();
-    ret = sem_counter_take( &pmsgq->sem_rd, tick );
+    ret = semc_take( &pmsgq->sem_rd, tick );
     if ( ret ) {
         arch_interrupt_enable(old);
         return ret;
@@ -1315,7 +1308,7 @@ int msgq_recieve( msgq_t *pmsgq, void *buff, int buff_size, int tick, int keep )
         memcpy( buff, pmsgq->buff + pmsgq->unit_size*rd, pmsgq->unit_size );
     }
 
-    sem_counter_give( &pmsgq->sem_wr );
+    semc_give( &pmsgq->sem_wr );
     return 0;
 }
 /**
@@ -1353,7 +1346,7 @@ int msgq_send( msgq_t *pmsgq, const void *buff, int size, int tick )
     /*
      *  this function can be used in interrupt context.
      */
-    ret = sem_counter_take( &pmsgq->sem_wr, tick );
+    ret = semc_take( &pmsgq->sem_wr, tick );
     if ( ret ) {
         arch_interrupt_enable(old);
         return ret;
@@ -1368,7 +1361,7 @@ int msgq_send( msgq_t *pmsgq, const void *buff, int size, int tick )
         memcpy( pmsgq->buff + pmsgq->unit_size*wr, buff, int_min(pmsgq->unit_size, size) );
     }
 
-    sem_counter_give( &pmsgq->sem_rd );
+    semc_give( &pmsgq->sem_rd );
     return 0;
 }
 

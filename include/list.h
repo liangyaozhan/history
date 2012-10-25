@@ -5,7 +5,8 @@
 #ifndef NULL
 #define NULL ((void*)0)
 #endif
-
+#define __inline__ __inline
+#define inline __inline
 /*
  * Simple doubly linked list implementation.
  *
