@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-10-24 21:43:34 Wednesday by lyzh>
+/* Last modified Time-stamp: <2012-10-28 08:38:02 Sunday by lyzh>
  * @(#)bsp.c
  */
 
@@ -19,9 +19,9 @@ int os_clk_init( void )
 
 void SysTick_Handler(void)
 {
-	extern void softtimer_anounce( void );
+	extern void softtimer_announce( void );
 	ENTER_INT_CONTEXT();
-	softtimer_anounce();
+	softtimer_announce();
 	EXIT_INT_CONTEXT();
 }
 

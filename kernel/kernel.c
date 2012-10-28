@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-10-26 06:23:18 Friday by lyzh>
+/* Last modified Time-stamp: <2012-10-28 09:49:17 Sunday by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -74,7 +74,7 @@ static int            priority_q_remove( priority_q_bitmap_head_t *pqHead, pqn_t
 static void           softtimer_set_func( softtimer_t *pNode, void (*func)(softtimer_t *) );
 static void           softtimer_add(softtimer_t *pdn, unsigned int uiTick);
 static void           softtimer_remove ( softtimer_t *pdn );
-void                  softtimer_anounce( void );
+void                  softtimer_announce( void );
 void                  context_switch_start( void );
 void                  __release_holded_mutex( tcb_t *ptcb );
 static void           __release_one_mutex( mutex_t *semid );
@@ -262,7 +262,7 @@ void softtimer_set_func( softtimer_t *pNode, void (*func)(softtimer_t *) )
     pNode->timeout_func = func;
 }
 
-void softtimer_anounce( void )
+void softtimer_announce( void )
 {
     int old = arch_interrupt_disable();
     
@@ -483,7 +483,7 @@ int semc_take( semaphore_t *semid, unsigned int tick )
     int TaskStatus = 0;
 
 #ifndef KERNEL_NO_ARG_CHECK
-    if ( unlikely(semid->type != SEM_TYPE_COUNT) ) {
+    if ( unlikely(semid->type != SEM_TYPE_COUNTER) ) {
         return -1;
     }
 #endif    
@@ -660,7 +660,7 @@ int mutex_unlock( mutex_t *semid )
     int old;
     
 #ifndef KERNEL_NO_ARG_CHECK
-    if ( unlikely(semid->type != SEM_TYPE_MUTEX) ) {
+    if ( unlikely(semid->s.type != SEM_TYPE_MUTEX) ) {
         return -EINVAL;
     }
     if ( unlikely(IS_INT_CONTEXT()) ) {
@@ -717,7 +717,7 @@ int semc_give( semaphore_t *semid )
     int               old;
     
 #ifndef KERNEL_NO_ARG_CHECK
-    if ( unlikely(semid->type != SEM_TYPE_COUNT) ) {
+    if ( unlikely(semid->type != SEM_TYPE_COUNTER) ) {
         return -EINVAL;
     }
 #endif
@@ -1156,7 +1156,7 @@ void task_idle( void *arg )
 
 void kernel_init( void )
 {
-    TASK_INFO_DECL(static, info1, 128+8);
+    TASK_INFO_DECL(static, info1, 1024);
     
     INIT_LIST_HEAD( &g_systerm_tasks_head );
     INIT_LIST_HEAD(&g_softtime_head);

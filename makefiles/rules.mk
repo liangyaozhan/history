@@ -286,7 +286,7 @@ $(ALL_SUB_PATH):
 
 # 使用for循环对每个子目录都执行make clean
 .PHONY:clean
-clean:
+clean:DO_SUB_DIR_ALL
 	rm -f -r $(OBJ_DIR)
 	rm -f $(EX_CLEAN_FILE) 
 

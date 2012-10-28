@@ -51,7 +51,7 @@ INC_PATH +=
 #在make clean时需要额外删除的文件.列在OBJS上的目标文件不需要再写在这里。
 # 如yylex.c yylex.h
 #EX_CLEAN_FILE += yylex.c yylex.h
-EX_CLEAN_FILE += 
+EX_CLEAN_FILE += -r ./output
 
 # 可指定子目录.若不定义此变量(需要把它注释)，则所有子目录都编译.
 # 注意：需要在"sinclude $(RTK_BASE)/makefiles/rules.mk"之前定义此变量

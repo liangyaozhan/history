@@ -8,20 +8,23 @@
 #CPU     ?= arm1176jzf-s
 #BSP_NAME ?= s3c6410x
 
-#CPU ?= arm920t
-#BSP_NAME ?= s3c2440
+CPU ?= arm920t
+BSP_NAME ?= s3c2440a
+ARMARCH  ?= armv4
 
 #CPU     ?= arm926ej-s
 #BSP_NAME ?= lpc3250
 
-CPU     ?= cortex-m3
-BSP_NAME ?= stm32f10x
-ARMARCH  ?= armv7m
+#CPU     ?=cortex-m3
+#BSP_NAME ?=stm32f10x
+#ARMARCH  ?=armv7m
+
+include $(RTK_BASE)/cfg/$(BSP_NAME)-cfg.mk
 
 # 版本定义:debug 或者 release. 默认是debug
 # debug版带调试信息,release 不带调试信息
-#VERSION ?= debug
-VERSION ?= release
+VERSION ?= debug
+#VERSION ?= release
 
 # 默认库名字
 DEFAULT_LIB_NAME:=librtk.a
@@ -35,6 +38,7 @@ CROSS_COMPILE =arm-none-eabi-
 # 其中目录$(RTK_BASE)是目录makefiles所在的目录。
 INC_PATH += .
 INC_PATH += $(RTK_BASE)/include
+INC_PATH += $(RTK_BASE)/bsp/$(BSP_NAME)
 
 #INC_PATH += /home/lyzh/Sourcery_G++_Lite/lib/gcc/arm-none-eabi/4.5.1/include/
 SYS_LIB_DIR := $(RTK_BASE)/output/$(CPU)$(VERSION)
@@ -47,21 +51,18 @@ CPPFLAGS +=
 ASFLAGS  += 
 
 # 编译C/C++和汇编文件共用的FLAGS
-COMMON_FLAGS += -DSTM32F10X_HD=1
-COMMON_FLAGS += -DUSE_STDPERIPH_DRIVER=1
-COMMON_FLAGS += -mthumb
-COMMON_FLAGS += -fomit-frame-pointer
+#COMMON_FLAGS += -fomit-frame-pointer
 COMMON_FLAGS += 
 
-COMMON_FLAGS +=  -fmessage-length=0
-COMMON_FLAGS +=  -ffunction-sections -fdata-sections
+#COMMON_FLAGS +=  -fmessage-length=0
+#COMMON_FLAGS +=  -ffunction-sections -fdata-sections
 COMMON_FLAGS +=  -Wall
 # 需要.lst文件时加入此参数
 #COMMON_FLAGS += -Wa,-adhlns="$@.lst"
 
 LDFLAGS += -Wl,--start-group -lgcc -Wl,--end-group
 # remove unused sections: -Xlinker --gc-sections
-LDFLAGS += -Xlinker --gc-sections
+#LDFLAGS += -Xlinker --gc-sections
 #print removed sections : -Xlinker --print-gc-sections
 #LDFLAGS += -Xlinker --print-gc-sections
 # Omit all symbo information (-s)

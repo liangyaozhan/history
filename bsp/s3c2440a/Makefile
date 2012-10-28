@@ -33,7 +33,9 @@ Makefile:;
 include $(RTK_BASE)/makefiles/config.mk
 
 #编译到$(MODULE_NAME)的目标文件
-COBJS   := $(patsubst %.c,%.o,$(wildcard *.c)) 
+#COBJS   := $(patsubst %.c,%.o,$(wildcard *.c)) 
+COBJS   := mmu-armarchv4.o mmu_setup.o
+COBJS   += s3c2440_clock.o	s3c2440_int.o s3c2440_timer.o serial.o s3c2440_uart.o s3c2440.o
 CPPOBJS := $(patsubst %.cpp,%.o,$(wildcard *.cpp)) 
 SOBJS   := $(patsubst %.S,%.o,$(wildcard *.S))
 
@@ -51,7 +53,7 @@ INC_PATH +=
 #在make clean时需要额外删除的文件.列在OBJS上的目标文件不需要再写在这里。
 # 如yylex.c yylex.h
 #EX_CLEAN_FILE += yylex.c yylex.h
-EX_CLEAN_FILE += -r output
+EX_CLEAN_FILE += 
 
 # 可指定子目录.若不定义此变量(需要把它注释)，则所有子目录都编译.
 # 注意：需要在"sinclude $(RTK_BASE)/makefiles/rules.mk"之前定义此变量
@@ -65,7 +67,7 @@ EX_CLEAN_FILE += -r output
 # 可以写在当前目录的dircfg.mk
 # 
 
-EXCLUDE_SUB_PATH:=output
+#EXCLUDE_SUB_PATH:=
 
 # 如果可能，则包含当前目录下的配置文件
 -include ./dircfg.mk

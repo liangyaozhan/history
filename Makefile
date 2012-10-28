@@ -68,6 +68,12 @@ EX_CLEAN_FILE +=
 #EXCLUDE_SUB_PATH:=
 ALL_SUB_PATH:= bsp arch kernel  libs
 
+
+ifeq ($(findstring clean,$(MAKECMDGOALS)),clean)
+ALL_SUB_PATH += app
+endif
+
+
 # 如果可能，则包含当前目录下的配置文件
 -include ./dircfg.mk
 

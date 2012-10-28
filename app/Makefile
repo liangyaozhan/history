@@ -63,9 +63,17 @@ EX_CLEAN_FILE +=
 #         subdir3:subdir2
 #         subdir2:subdir1
 # 可以写在当前目录的dircfg.mk
-# 
+#
+stm32f10x-apps := stm32-example1  stm32-example2
+s3c2440a-apps := s3c2440a_app1
 
-EXCLUDE_SUB_PATH:=keil-example1
+ifeq ($(findstring clean,$(MAKECMDGOALS)),clean)
+
+else
+ALL_SUB_PATH :=$($(BSP_NAME)-apps)
+endif
+
+
 
 # 如果可能，则包含当前目录下的配置文件
 -include ./dircfg.mk
