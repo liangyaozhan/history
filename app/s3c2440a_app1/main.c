@@ -56,6 +56,10 @@ static void led_task1( void *pa, void *pb)
 void mtask( void )
 {
     int i;
+    uint32_t total;
+    uint32_t used;
+    uint32_t max_used;
+    extern void memory_info(uint32_t *total, uint32_t *used, uint32_t *max_used);
     char *p;
     
     while (1) {
@@ -63,6 +67,8 @@ void mtask( void )
         kprintf("malloc working...p=0x%X\n", p );
         /* free( p ); */
         task_delay( 100 );
+        memory_info( &total, &used, &max_used );
+        kprintf("malloc info: %d(%X) %d %d\n", total, total, used, max_used );
     }
 }
 

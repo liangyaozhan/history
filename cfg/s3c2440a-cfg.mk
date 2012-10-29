@@ -13,3 +13,5 @@ LDFLAGS += -Wl,--start-group -lgcc -Wl,--end-group
 LDFLAGS += -Xlinker --gc-sections
 #print removed sections : -Xlinker --print-gc-sections
 #LDFLAGS += -Xlinker --print-gc-sections
+
+CONFIG_SMALL_MEMLIB := y
