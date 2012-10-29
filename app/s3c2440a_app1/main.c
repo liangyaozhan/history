@@ -1,5 +1,6 @@
 
 #include "rtk.h"
+#include "rtklib.h"
 
 int os_clk_init( void );
 
@@ -29,17 +30,40 @@ static void uart_task( char *pa, void *pb)
 		rand();
 		rand();
 		task_delay(10);
+        __asm volatile ("swi 0");
 	}
 }
 
 static void led_task1( void *pa, void *pb)
 {
+    int i = 0;
+    
     while (9) {
 		rand();
 		rand();
 		rand();
 		task_delay(10);
+        if ( ++i > 20 ) {
+            /*
+             *  data abort here.
+             *  0x4000000 is protected by mmu. So, data abort.
+             */
+            *(volatile int*)0x4000000 = 0;
+        }
 	}
+}
+
+void mtask( void )
+{
+    int i;
+    char *p;
+    
+    while (1) {
+        p = malloc( sizeof (int)*100 );
+        kprintf("malloc working...p=0x%X\n", p );
+        /* free( p ); */
+        task_delay( 100 );
+    }
 }
 
 static void led_task( void *pa, void *pb)
@@ -49,22 +73,31 @@ static void led_task( void *pa, void *pb)
 		rand();
 		rand();
 		task_delay(10);
+        /*
+         *  data abort here.
+         */
+        *(volatile int *)-1 = 0;
     }
 }
 
 void main_task( void *pa, void *pb)
 {
+    tcb_t *ptcb;
+    
     int i = 0;
     
     bsp_init();
 	/* os_clk_init(); */
+
+    ptcb = task_create("malloc_tasking", 4, 1024, 0,mtask, 1,2 );
+    task_startup( ptcb );
+    
 	while (9) {
 		rand();
 		rand();
 		rand();
 		task_delay(10);
         kprintf("hello world %d\n", i++);
-        
 	}
 }
 
@@ -76,6 +109,8 @@ void set_abort_stack( unsigned int top );
 int main()
 {
     extern void *lds_mmu_table_address;                                     /*  from ld script  */
+    extern int  __sys_heap_start__;
+    extern int __sys_heap_end__;
     static int irq_stack[1024];
     static int fiq_stack[1024];
     static int abort_stack[1024];
@@ -92,6 +127,8 @@ int main()
     set_abort_stack( (unsigned int)(abort_stack+1024-1) );
     arm_mmu_table_setup((unsigned int)&lds_mmu_table_address );
     enable_mmu( (unsigned int)&lds_mmu_table_address );
+
+    system_heap_init( &__sys_heap_start__, &__sys_heap_end__ );
     
 	kernel_init();
     

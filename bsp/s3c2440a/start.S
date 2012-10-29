@@ -113,7 +113,7 @@ reset:
      * we do sys-critical inits only at reboot,
      * not when booting from ram!
      */
-    /** bl    cpu_init_crit **/
+    bl    cpu_init_crit
 
     /* Set up the stack                            */
 stack_setup:

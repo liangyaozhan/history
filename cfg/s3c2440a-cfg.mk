@@ -6,6 +6,8 @@ COMMON_FLAGS +=  -Wall
 # 需要.lst文件时加入此参数
 #COMMON_FLAGS += -Wa,-adhlns="$@.lst"
 
+COMMON_FLAGS += -DALIGN_SIZE=8
+COMMON_FLAGS += -DMEM_STATS
 LDFLAGS += -Wl,--start-group -lgcc -Wl,--end-group
 # remove unused sections: -Xlinker --gc-sections
 LDFLAGS += -Xlinker --gc-sections
