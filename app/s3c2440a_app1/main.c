@@ -59,16 +59,19 @@ void mtask( void )
     uint32_t total;
     uint32_t used;
     uint32_t max_used;
+    int size;
     extern void memory_info(uint32_t *total, uint32_t *used, uint32_t *max_used);
     char *p;
     
     while (1) {
-        p = malloc( sizeof (int)*100 );
+        size = rand()%10000;
+        p = malloc( size );
+        memset(p, 0xff, size );
         kprintf("malloc working...p=0x%X\n", p );
-        /* free( p ); */
-        task_delay( 100 );
+        task_delay( 10 );
         memory_info( &total, &used, &max_used );
         kprintf("malloc info: %d(%X) %d %d\n", total, total, used, max_used );
+        free(p);
     }
 }
 
@@ -88,15 +91,20 @@ static void led_task( void *pa, void *pb)
 
 void main_task( void *pa, void *pb)
 {
-    tcb_t *ptcb;
-    
-    int i = 0;
+    tcb_t      *ptcb;
+    extern int  __sys_heap_start__;
+    extern int  __sys_heap_end__;
+    int         i = 0;
     
     bsp_init();
+    system_heap_init( &__sys_heap_start__, &__sys_heap_end__ );
+
 	/* os_clk_init(); */
 
-    ptcb = task_create("malloc_tasking", 4, 1024, 0,mtask, 1,2 );
-    task_startup( ptcb );
+    for (i = 0; i < 1000; i++) {
+        ptcb = task_create("malloc_tasking", 4, 1024, 0,mtask, 1,2 );
+        task_startup( ptcb );
+    }
     
 	while (9) {
 		rand();
@@ -115,8 +123,6 @@ void set_abort_stack( unsigned int top );
 int main()
 {
     extern void *lds_mmu_table_address;                                     /*  from ld script  */
-    extern int  __sys_heap_start__;
-    extern int __sys_heap_end__;
     static int irq_stack[1024];
     static int fiq_stack[1024];
     static int abort_stack[1024];
@@ -134,7 +140,6 @@ int main()
     arm_mmu_table_setup((unsigned int)&lds_mmu_table_address );
     enable_mmu( (unsigned int)&lds_mmu_table_address );
 
-    system_heap_init( &__sys_heap_start__, &__sys_heap_end__ );
     
 	kernel_init();
     

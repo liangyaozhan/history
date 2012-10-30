@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-10-29 22:19:32 Monday by lyzh>
+/* Last modified Time-stamp: <2012-10-30 20:43:01 Tuesday by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -26,7 +26,7 @@
 #include "list.h"
 #include "rtk_config.h"
 
-#define size_t unsigned int
+#define size_t uint32_t
 
 /**
  *  @addtogroup kernel

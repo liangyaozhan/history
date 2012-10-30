@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-10-29 22:16:59 Monday by lyzh>
+/* Last modified Time-stamp: <2012-10-30 21:26:07 Tuesday by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -1013,6 +1013,7 @@ int task_terminate( tcb_t *ptcb )
     
     old = arch_interrupt_disable();
     if ( ptcb->safe_count ) {
+        ret = -EPERM;
         goto done;
     }
     
@@ -1152,7 +1153,7 @@ void task_idle( void *arg )
 
 void kernel_init( void )
 {
-    TASK_INFO_DECL(static, info1, 128+8);
+    TASK_INFO_DECL(static, info1, 256 );
     
     INIT_LIST_HEAD( &g_systerm_tasks_head );
     INIT_LIST_HEAD(&g_softtime_head);
