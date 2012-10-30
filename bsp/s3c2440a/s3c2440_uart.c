@@ -131,7 +131,7 @@ int serial_putc(unsigned char c)
 
     UTXH0 = c;
     if ( c == '\n' ) {
-        kputc( '\r' );
+    	serial_putc( '\r' );
     }
     return 1;
 }
