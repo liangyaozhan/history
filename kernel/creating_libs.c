@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-10-29 22:16:27 Monday by lyzh>
+/* Last modified Time-stamp: <2012-10-30 08:04:45 Tuesday by lyzh>
  * @(#)creating_libs.c
  */
 
@@ -72,9 +72,9 @@ tcb_t *task_create(const char *name,
     char  *stack;
     int    len = strlen( name )+1;
 
-    p = malloc( sizeof( tcb_t ) );
-    stack  = malloc( stack_size+len );
-    if ( !p || !stack ) {
+    p = malloc( sizeof( tcb_t ) + stack_size+len );
+    stack = (char*)p + sizeof( tcb_t );
+    if ( !p ) {
         goto err_done;
     }
     memcpy( stack+stack_size, name, len );
@@ -86,10 +86,25 @@ err_done:
     if (p) {
         free(p);
     }
-    if ( stack ) {
-        free( stack );
-    }
     return NULL;
+}
+
+int task_delete( tcb_t *ptcb )
+{
+    int flag = 1;
+    int ret;
+    
+    if ( ptcb == NULL || ptcb == ptcb_current ) {
+        /*
+         *  TODO: how to free memory?
+         */
+        flag = 0;
+    }
+    ret = task_terminate( ptcb );
+    if ( flag ) {
+        free( ptcb );
+    }
+    return ret;
 }
 
 msgq_t *msgq_create( int element_size, int element_count )
