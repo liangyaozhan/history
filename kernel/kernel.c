@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-10-28 09:49:17 Sunday by lyzh>
+/* Last modified Time-stamp: <2012-10-29 22:16:59 Monday by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -385,7 +385,7 @@ int mutex_terminate( mutex_t *semid )
     __mutex_owner_set( semid, NULL );
     __sem_terminate( (semaphore_t*)semid );
     arch_interrupt_enable( old );
-	  return 0;
+    return 0;
 }
 
 
@@ -1006,6 +1006,10 @@ int task_terminate( tcb_t *ptcb )
     int old;
     int ret = 0;
     struct list_head *save, *p;
+
+    if ( ptcb == NULL ) {
+        ptcb = ptcb_current;
+    }
     
     old = arch_interrupt_disable();
     if ( ptcb->safe_count ) {
@@ -1107,11 +1111,7 @@ void schedule_internel( void )
 
     p = highest_tcb_get();
     if ( p != ptcb_current) {
-        if (IS_INT_CONTEXT()) {
-            arch_context_switch_interrupt( &ptcb_current->sp, &p->sp);
-        } else {
-            arch_context_switch( &ptcb_current->sp, &p->sp);        
-        }
+        arch_context_switch( &ptcb_current->sp, &p->sp);        
     }
 }
 
@@ -1135,11 +1135,7 @@ void schedule( void )
     
     p = highest_tcb_get();
     if ( p != ptcb_current ){
-        if (IS_INT_CONTEXT()) {
-            arch_context_switch_interrupt( &ptcb_current->sp, &p->sp);
-        } else {
-            arch_context_switch( &ptcb_current->sp, &p->sp);        
-        }
+        arch_context_switch( &ptcb_current->sp, &p->sp);        
     }
   done:
     arch_interrupt_enable(old);
@@ -1156,7 +1152,7 @@ void task_idle( void *arg )
 
 void kernel_init( void )
 {
-    TASK_INFO_DECL(static, info1, 1024);
+    TASK_INFO_DECL(static, info1, 128+8);
     
     INIT_LIST_HEAD( &g_systerm_tasks_head );
     INIT_LIST_HEAD(&g_softtime_head);
@@ -1191,6 +1187,17 @@ int msgq_init( msgq_t *pmsgq, void *buff, int buffer_size, int unit_size )
     semc_init( &pmsgq->sem_rd,  0 );
     semc_init( &pmsgq->sem_wr,  count );
 
+    return 0;
+}
+
+int msgq_terminate( msgq_t *pmsgq )
+{
+    int old;
+
+    old = arch_interrupt_disable();
+    semb_terminate( &pmsgq->sem_rd );
+    semb_terminate( &pmsgq->sem_wr );
+    arch_interrupt_enable( old );
     return 0;
 }
 
@@ -1291,6 +1298,7 @@ int msgq_send( msgq_t *pmsgq, const void *buff, int size, int tick )
 int msgq_clear( msgq_t *pmsgq )
 {
     int old;
+    int n;
 
     if ( NULL == pmsgq ) {
         return -1;
@@ -1301,8 +1309,11 @@ int msgq_clear( msgq_t *pmsgq )
     pmsgq->sem_rd.u.count = 0;
     pmsgq->rd             = pmsgq->wr = 0;
 
-    if ( __sem_wakeup_pender(&pmsgq->sem_wr, 0) &&
-         !IS_INT_CONTEXT() ) {
+    n = 0;
+    while ( __sem_wakeup_pender(&pmsgq->sem_wr, 0) ) {
+        n++;
+    }
+    if ( n && !IS_INT_CONTEXT() ) {
         schedule_internel();
     }
     arch_interrupt_enable(old);

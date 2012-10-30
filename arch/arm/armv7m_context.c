@@ -1,5 +1,5 @@
-/* Last modified Time-stamp: <2012-10-23 19:03:29 Tuesday by lyzh>
- * @(#)armv6m_context.c
+/* Last modified Time-stamp: <2012-10-29 20:40:19 Monday by lyzh>
+ * @(#)armv7m_context.c
  */
 
 #include "rtk.h"
@@ -44,10 +44,10 @@ extern long list_thread(void);
 /**
  * fault exception handling
  */
-void arch_hard_fault_exception( int **sp )
+void arch_hard_fault_exception( int lr )
 {
-	kprintf("hard fault on thread %s\n", CURRENT_TASK_NAME());
-	while (1);
+	kprintf("hard fault on thread %s, terminated.\n", CURRENT_TASK_NAME());
+	task_terminate( ptcb_current );
 }
 
 /**

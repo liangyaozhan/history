@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-10-26 05:59:03 Friday by lyzh>
+/* Last modified Time-stamp: <2012-10-29 22:19:32 Monday by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -25,6 +25,8 @@
 #include <stdint.h>
 #include "list.h"
 #include "rtk_config.h"
+
+#define size_t unsigned int
 
 /**
  *  @addtogroup kernel
@@ -656,6 +658,9 @@ int mutex_terminate( mutex_t *mutex );
  */
 int msgq_init( msgq_t *pmsgq, void *buff, int buffer_size, int unit_size );
 
+int msgq_terminate( msgq_t *pmsgq );
+
+
 /**
  *  @brief recieve msg from a msgQ
  *  @param pmsgq     a pointor to the msgQ.(the return value of function msgq_create)
@@ -736,14 +741,6 @@ int ffs( unsigned int q );
  */
 void *memcpy(void *dst0, const void *src0, int len0);
 
-/**
- *  @brief standard memset
- */
-void *memset(void *m, int c, int n);
-/**
- *  @brief standard strlen
- */
-int strlen(const char*);
 
 /**
  *  @}

@@ -11,6 +11,8 @@ LDFLAGS += -Xlinker --gc-sections
 #print removed sections : -Xlinker --print-gc-sections
 #LDFLAGS += -Xlinker --print-gc-sections
 
+COMMON_FLAGS += -DMEM_STATS
+COMMON_FLAGS += -DALIGN_SIZE=4
 
 COMMON_FLAGS += -mthumb
 COMMON_FLAGS += -DSTM32F10X_HD=1
