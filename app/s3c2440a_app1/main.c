@@ -64,14 +64,19 @@ void mtask( void )
     char *p;
     
     while (1) {
-        size = rand()%10000;
+        size = rand()%100000;
         p = malloc( size );
-        memset(p, 0xff, size );
+        if ( p ) {
+            memset(p, 0xff, size );
+        }
+        
         kprintf("malloc working...p=0x%X\n", p );
         task_delay( 10 );
         memory_info( &total, &used, &max_used );
         kprintf("malloc info: %d(%X) %d %d\n", total, total, used, max_used );
-        free(p);
+        if ( p ) {
+            free(p);
+        }
     }
 }
 
