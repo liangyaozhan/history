@@ -480,8 +480,9 @@ void *malloc(size_t size)
 	slab_chunk *chunk;
 	struct memusage *kup;
 
-	/* zero size, return RT_NULL */
-	if (size == 0) return RT_NULL;
+	/* zero size, is allowed. */
+	if (size == 0)
+        size = 1;
 
 	/*
 	 * Handle large allocations directly.  There should not be very many of
