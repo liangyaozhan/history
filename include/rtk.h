@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-10-30 20:43:01 Tuesday by lyzh>
+/* Last modified Time-stamp: <2012-11-01 07:48:31 Thursday by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -56,7 +56,7 @@
 /**
  *  @brief ROUND DOWN and UP
  */
-#define ROUND_DOWN(p, d)        (((int)p - ((d)-1)) & (~(d-1)))
+#define ROUND_DOWN(p, d)        (((int)p) & (~(d-1)))
 #define ROUND_UP(x, align)  (((int) (x) + (align - 1)) & ~(align - 1))
 
 #if DEBUG>0
@@ -293,7 +293,7 @@ typedef struct __msgq_t msgq_t;
  *  infomation value 'info' is from TASK_INFO_DECL().
  */
 #define TASK_INIT(name, info, priority, func, arg1, arg2)               \
-    task_init( &info.tcb, (name), (priority), 0, info.stack, info.stack+sizeof(info.stack), func, (arg1), (arg2) )
+    task_init( &info.tcb, (name), (priority), 0, info.stack, info.stack+sizeof(info.stack)-1, func, (arg1), (arg2) )
 /**
  *  @brief task startup macro.
  *
