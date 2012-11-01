@@ -341,7 +341,7 @@ void task_init(tcb_t      *ptcb,
  *  add a task to running queue.
  */
 int task_startup( tcb_t *ptcb );
-int task_priority_set( tcb_t *ptcb, int priority );
+int task_priority_set( tcb_t *ptcb, unsigned int priority );
 /**
  *  @brief starting up operating system.
  *

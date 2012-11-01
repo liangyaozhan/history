@@ -71,7 +71,7 @@ void mtask( void )
         }
         
         kprintf("malloc working...p=0x%X\n", p );
-        task_delay( 10 );
+        task_delay( rand() % 10000 );
         memory_info( &total, &used, &max_used );
         kprintf("malloc info: %d(%X) %d %d\n", total, total, used, max_used );
         if ( p ) {
@@ -100,6 +100,7 @@ void main_task( void *pa, void *pb)
     extern int  __sys_heap_start__;
     extern int  __sys_heap_end__;
     int         i = 0;
+    char name[32]="task0000";
     
     bsp_init();
     system_heap_init( &__sys_heap_start__, &__sys_heap_end__ );

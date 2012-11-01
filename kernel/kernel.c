@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-11-01 08:05:52 Thursday by lyzh>
+/* Last modified Time-stamp: <2012-11-01 14:51:57 Thursday by liangyaozhan>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -36,10 +36,10 @@
 #undef int_min
 #define int_min(a, b) ((a)>(b)?(b):(a))
 
-#if (MAX_PRIORITY&(32-1))
-#define __MAX_GROUPS    (MAX_PRIORITY/32+1)
+#if ((MAX_PRIORITY+1)&(32-1))
+#define __MAX_GROUPS    ((MAX_PRIORITY+1)/32+1)
 #else
-#define __MAX_GROUPS    (MAX_PRIORITY/32)
+#define __MAX_GROUPS    ((MAX_PRIORITY+1)/32)
 #endif
 
 
@@ -48,7 +48,7 @@ struct __priority_q_bitmap_head
     pqn_t       *phighest_node; 
     unsigned int      bitmap_group;
     uint32_t          bitmap_tasks[__MAX_GROUPS];
-    struct list_head  tasks[MAX_PRIORITY];
+    struct list_head  tasks[MAX_PRIORITY+1];
 };
 typedef struct __priority_q_bitmap_head priority_q_bitmap_head_t;
 
@@ -103,7 +103,7 @@ void priority_q_init( priority_q_bitmap_head_t *pqriHead )
         pqriHead->bitmap_tasks[i] = 0;
     }
 
-    for (i = 0; i < MAX_PRIORITY; i++) {
+    for (i = 0; i <= MAX_PRIORITY; i++) {
         INIT_LIST_HEAD( &pqriHead->tasks[i] );
     }
 }
@@ -734,6 +734,10 @@ int semc_give( semaphore_t *semid )
     return 0;
 }
 
+/*
+ * 获得semid的等待队列的优先级。
+ * 队列的优先级定义为该队列中最高的优先级的数值。
+ */
 static inline
 int __get_pend_list_priority ( semaphore_t *semid )
 {
@@ -743,9 +747,13 @@ int __get_pend_list_priority ( semaphore_t *semid )
         ptcb = PEND_NODE_TO_PTCB( LIST_FIRST(&semid->pending_tasks) );
         return ptcb->current_priority;
     }
-    return MAX_PRIORITY;
+    return MAX_PRIORITY+1;
 }
 
+/*
+ * 获得semid的等待队列的优先级。
+ * 队列的优先级定义为该队列中最高的优先级的数值。
+ */
 static inline
 int __get_mutex_hold_list_priority ( tcb_t *ptcb )
 {
@@ -755,8 +763,12 @@ int __get_mutex_hold_list_priority ( tcb_t *ptcb )
         semid = SEM_MEMBER_PTR_TO_SEMID( LIST_FIRST(&ptcb->mutex_holded_head) );
         return __get_pend_list_priority((semaphore_t*)semid);
     }
-    return MAX_PRIORITY;
+    return MAX_PRIORITY+1;
 }
+
+/*
+ * 把任务控制块存放到队列中。按优先级高到低顺序存放。
+ */
 static inline
 void __put_tcb_to_pendlist( semaphore_t *semid, tcb_t *ptcbToAdd )
 {
@@ -773,6 +785,9 @@ void __put_tcb_to_pendlist( semaphore_t *semid, tcb_t *ptcbToAdd )
     list_add_tail( &ptcbToAdd->sem_node, p );
 }
 
+/*
+ * 设置互斥量的所有者。
+ */
 static
 int  __mutex_owner_set( mutex_t *semid, tcb_t *ptcbToAdd )
 {
@@ -800,6 +815,10 @@ int  __mutex_owner_set( mutex_t *semid, tcb_t *ptcbToAdd )
     return 0;
 }
 
+/*
+ * 唤醒semid等待队列中优先级最高的任务。唤醒参数为err.
+ * 当err为0时，不移除定时器。
+ */
 static
 tcb_t *__sem_wakeup_pender( semaphore_t *semid, int err )
 {
@@ -825,6 +844,11 @@ tcb_t *__sem_wakeup_pender( semaphore_t *semid, int err )
     return ptcbwakeup;
 }
 
+
+/**
+ *  由于ptcbOwner->current_priority的变化。semid的pending_tasks队列需要调整.
+ *  返回调整后，是否更改了整个队列的优先级(最高的那个任务的优先级)。
+ */
 static
 int __resort_hold_mutex_list_and_trig( mutex_t *semid, tcb_t *ptcbOwner )
 {
@@ -836,17 +860,24 @@ int __resort_hold_mutex_list_and_trig( mutex_t *semid, tcb_t *ptcbOwner )
     return pri > __get_mutex_hold_list_priority(ptcbOwner);
 }
 
+/**
+ *  由于ptcb->current_priority的变化。semid的pending_tasks队列需要调整.
+ *  返回调整后，是否更改了整个队列的优先级(最高的那个任务的优先级)。
+ */
 static
 int __resort_pend_list_and_trig( semaphore_t *semid, tcb_t *ptcb )
 {
     int pri;
     
-    pri = __get_pend_list_priority(semid);
     list_del_init( &ptcb->sem_node );
+    pri = __get_pend_list_priority(semid);
     __put_tcb_to_pendlist( semid, ptcb );
     return pri > __get_pend_list_priority(semid);
 }
 
+/**
+ * 把任务控制块插入到semid的等待队列。并返回是否改变队列的优先级。
+ */
 static
 int __insert_pend_list_and_trig( semaphore_t *semid, tcb_t *ptcb )
 {
@@ -860,13 +891,13 @@ int __insert_pend_list_and_trig( semaphore_t *semid, tcb_t *ptcb )
 /**
  *  @brief set task priority 
  *  @fn task_priority_set
- *  @param[in]  ptcb        task control block.
- *  @param[in]  priority    priority
- *  @return 0               ok.
- *  @return others          ERROR.
- *
+ *  @param[in]  ptcb            task control block pointor. If NULL, current task's
+ *                              priority will be change.
+ *  @param[in]  new_priority    new priority.
+ *  @return     0               successfully.
+ *  @return     -EINVAL         Invalid argument.
  *  basic rules:
- *      1. if task's priority goes up, we must check if we need to do something with
+ *      1. if task's priority changed, we must check if we need to do something with
  *         it's pending resource (only when it's status is pending).
  *      2. if task's priority goes down, we must check mutex list's priority.
  *         Maybe it's priority cannot go down right now.
@@ -878,42 +909,39 @@ int __insert_pend_list_and_trig( semaphore_t *semid, tcb_t *ptcb )
  *                     |                  |
  *              current priority    normal priority
  */
-int task_priority_set( tcb_t *ptcb, int priority )
+int task_priority_set( tcb_t *ptcb, unsigned int priority )
 {
     int old;
     int ret = 0;
     int need = 0;/* need to call scheduler */
 
+    if ( ptcb == NULL ) {
+        ptcb = ptcb_current;
+    }
+    if ( priority > MAX_PRIORITY ) {
+        return -EINVAL;
+    }
+    
+    
     old = arch_interrupt_disable();
     if ( ptcb->priority == priority ) {
         goto done;
     }
     
     ptcb->priority = priority;
-    if ( priority < ptcb->current_priority ) {
-        /*
-         *  priority goes up
-         */
+    if ( priority < ptcb->current_priority ) {     /* priority goes up */
+        ptcb->current_priority = priority;
+    } else if ( __get_mutex_hold_list_priority( ptcb ) >= priority ) {
+        ptcb->current_priority = priority;/* priority can go down at the moment. */
+    }
+
+    if ( ptcb->status & TASK_PENDING ) {
         semaphore_t *semid;
         int          trig;
-        
-        ptcb->current_priority = priority;
-        if ( ptcb->status & TASK_PENDING ) {
-            semid   = PLIST_PTR_TO_SEMID( ptcb->psem_list );
-            trig = __resort_pend_list_and_trig( (semaphore_t*)semid, ptcb );
-            if ( trig && semid->type == SEM_TYPE_MUTEX ) {
-                need = __mutex_raise_owner_priority( (mutex_t*)semid, priority );
-            }
-        }
-    } else {
-        /*
-         *  priority goes down. check if it can go down now.
-         */
-        if ( __get_mutex_hold_list_priority( ptcb ) >= priority ) {
-            /*
-             *  priority can go down at the monent.
-             */
-            ptcb->current_priority = priority;
+        semid   = PLIST_PTR_TO_SEMID( ptcb->psem_list );
+        trig = __resort_pend_list_and_trig( (semaphore_t*)semid, ptcb );
+        if ( trig && semid->type == SEM_TYPE_MUTEX ) {
+            need = __mutex_raise_owner_priority( (mutex_t*)semid, priority );
         }
     }
 
@@ -1155,7 +1183,7 @@ void kernel_init( void )
     INIT_LIST_HEAD( &g_systerm_tasks_head );
     INIT_LIST_HEAD(&g_softtime_head);
     priority_q_init( &g_readyq );
-    TASK_INIT( "idle", info1, MAX_PRIORITY-1, task_idle, 0,0 );
+    TASK_INIT( "idle", info1, MAX_PRIORITY, task_idle, 0,0 );
     TASK_STARTUP(info1);
 }
 
@@ -1201,20 +1229,18 @@ int msgq_terminate( msgq_t *pmsgq )
 
 
 /**
- *  @brief recieve msg from a msgQ
+ *  @brief receive msg from a msgQ
  *  @param pmsgq     a pointor to the msgQ.(the return value of function msgq_create)
  *  @param buff      the memory to store the msg. It can be NULL. if
  *                   it is NULL, it just remove one message from the head.
  *  @param buff_size the buffer size.
  *  @param tick      the max time to wait if there is no message.
  *                   if pass -1 to this, it will wait forever.
- *  @param keep      0: copy the msg to the buffer and then remove it.
- *                   !0: copy the msg to the buffer, but do not remove it.
  *  @retval -1       error, please check errno. if errno == ETIME, it means Timer expired,
  *                   if errno == ENOMEM, it mean buffer_size if not enough.
- *  @retval 0        recieve successfully.
+ *  @retval 0        receive successfully.
  */
-int msgq_recieve( msgq_t *pmsgq, void *buff, int buff_size, int tick, int keep )
+int msgq_receive( msgq_t *pmsgq, void *buff, int buff_size, int tick )
 {
     int ret;
     int rd;
@@ -1227,9 +1253,8 @@ int msgq_recieve( msgq_t *pmsgq, void *buff, int buff_size, int tick, int keep )
         return ret;
     }
     rd = pmsgq->rd;
-    if ( !keep ) {
-        pmsgq->rd = (pmsgq->rd + 1) % pmsgq->count;
-    }
+    pmsgq->rd = (pmsgq->rd + 1) % pmsgq->count;
+
     arch_interrupt_enable(old);
 
     if ( buff ) {
