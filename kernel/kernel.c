@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-10-30 21:26:07 Tuesday by lyzh>
+/* Last modified Time-stamp: <2012-11-01 08:05:52 Thursday by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -857,84 +857,81 @@ int __insert_pend_list_and_trig( semaphore_t *semid, tcb_t *ptcb )
     return pri > __get_pend_list_priority(semid);
 }
 
+/**
+ *  @brief set task priority 
+ *  @fn task_priority_set
+ *  @param[in]  ptcb        task control block.
+ *  @param[in]  priority    priority
+ *  @return 0               ok.
+ *  @return others          ERROR.
+ *
+ *  basic rules:
+ *      1. if task's priority goes up, we must check if we need to do something with
+ *         it's pending resource (only when it's status is pending).
+ *      2. if task's priority goes down, we must check mutex list's priority.
+ *         Maybe it's priority cannot go down right now.
+ *
+ *            P0                 P1                P2
+ *             |                  |                 |
+ *  0(high) ==============================================>> 256(low priority)
+ *                     ^                  ^
+ *                     |                  |
+ *              current priority    normal priority
+ */
 int task_priority_set( tcb_t *ptcb, int priority )
 {
     int old;
-    int need = 0;
     int ret = 0;
+    int need = 0;/* need to call scheduler */
 
     old = arch_interrupt_disable();
     if ( ptcb->priority == priority ) {
         goto done;
     }
     
-    if ( ptcb->status == TASK_READY ) {
-        need = 1;
-        goto tr;
-    } else if ( ptcb->status & TASK_PENDING ) {
+    ptcb->priority = priority;
+    if ( priority < ptcb->current_priority ) {
+        /*
+         *  priority goes up
+         */
         semaphore_t *semid;
         int          trig;
         
-        if ( priority < ptcb->current_priority ) {
-            ptcb->current_priority = ptcb->priority = priority;
+        ptcb->current_priority = priority;
+        if ( ptcb->status & TASK_PENDING ) {
             semid   = PLIST_PTR_TO_SEMID( ptcb->psem_list );
             trig = __resort_pend_list_and_trig( (semaphore_t*)semid, ptcb );
             if ( trig && semid->type == SEM_TYPE_MUTEX ) {
                 need = __mutex_raise_owner_priority( (mutex_t*)semid, priority );
             }
-        } else if ( priority < ptcb->priority ){
-            ptcb->priority = priority;
-        } else {
-            ptcb->current_priority = ptcb->priority = priority;
         }
-    } else if ( ptcb->status & TASK_DELAY ) {
-        need = 0;
-        goto tr;
-    }
-    
-    goto done;
-
-tr:
-    if ( priority < ptcb->current_priority ) {
-        /*
-         *  higher than ptcb->current_priority
-         */
-        ptcb->current_priority = ptcb->priority = priority;
-        if ( need ) {
-            READY_Q_REMOVE( ptcb );
-            READY_Q_PUT( ptcb, priority );
-        }
-    } else if ( ptcb->current_priority < ptcb->priority ) {
-        /*
-         *  task was raised up.
-         */
-        ptcb->priority  = priority;
     } else {
         /*
-         *  current_priority == priority  TASK is ready
+         *  priority goes down. check if it can go down now.
          */
-        /*
-         *  down,
-         *  check if it can down right now.
-         */
-        if ( __get_mutex_hold_list_priority(ptcb) < priority ) {
-            ptcb->priority  = priority;
-        } else {
-            ptcb->current_priority = ptcb->priority = priority;
-            if ( need ) {
-                READY_Q_REMOVE( ptcb );
-                READY_Q_PUT( ptcb, priority );
-            }
+        if ( __get_mutex_hold_list_priority( ptcb ) >= priority ) {
+            /*
+             *  priority can go down at the monent.
+             */
+            ptcb->current_priority = priority;
         }
+    }
+
+    if ( (ptcb->status == TASK_READY) &&
+         (ptcb->current_priority == priority) ) {
+        READY_Q_REMOVE( ptcb );
+        READY_Q_PUT( ptcb, ptcb->current_priority );
+        need = 1;
+    }
+    if ( need && !IS_INT_CONTEXT()) {
+        schedule_internel();
     }
     
 done:
-    if ( need && !IS_INT_CONTEXT() ) {
-        schedule_internel();
-    }
     arch_interrupt_enable( old );
     return ret;
 }
+
 
 static
 int __mutex_raise_owner_priority( mutex_t *semid, int priority )
