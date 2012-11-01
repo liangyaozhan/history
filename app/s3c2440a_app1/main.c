@@ -106,6 +106,9 @@ void main_task( void *pa, void *pb)
     system_heap_init( &__sys_heap_start__, &__sys_heap_end__ );
 
 	/* os_clk_init(); */
+    kprintf("sizeof tcb=%d\n", sizeof(tcb_t));
+
+    task_delay( 5000 );
 
     for (i = 0; i < 1000; i++) {
         ptcb = task_create("malloc_tasking", 4, 1024, 0,mtask, 1,2 );

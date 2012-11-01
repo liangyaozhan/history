@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-11-01 07:48:31 Thursday by lyzh>
+/* Last modified Time-stamp: <2012-11-02 07:53:30 Friday by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -120,18 +120,18 @@ struct __tcb_t
     const char       *name;                 /*!< task's name            */
     char             *stack_low;            /*!< stack low pointor      */
     char             *stack_high;           /*!< stack high pointor     */
-    int               option;               /*!< for the further        */
-    int               current_priority;     /*!< running priority       */
-    int               priority;             /*!< normal priority        */
     pqn_t             prio_node;            /*!< node in priority Q     */
     softtimer_t       tick_node;            /*!< node in softtimer Q    */
     struct list_head  sem_node;             /*!< node in pending Q      */
     struct list_head *psem_list;            /*!< pend node if any       */
     struct list_head  mutex_holded_head;    /*!< remember all mutex     */
     struct list_head  task_list_node;       /*!< node in task list      */
+    int               option;               /*!< for the further        */
+    int               current_priority;     /*!< running priority       */
+    int               priority;             /*!< normal priority        */
     int               err;                  /*!< errno used internal    */
     int               safe_count;           /*!< prevent task deletion  */
-    int status;                             /*!< task status            */
+    int               status;                             /*!< task status            */
 };
 
 
