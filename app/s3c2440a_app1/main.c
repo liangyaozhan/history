@@ -81,11 +81,9 @@ void mtask( void )
     extern void memory_info(uint32_t *total, uint32_t *used, uint32_t *max_used);
     char *p;
     int ret;
-    //task_delay(1);
-    semb_take( &sem, -1 );
-
+    
     while (1) {
-    	/*task_priority_set( tcbs[rand()%MAX_T], rand()%MAX_PRIORITY );*/
+    	task_priority_set( tcbs[rand()%MAX_T], rand()%MAX_PRIORITY );
         size = rand()%100000;
 		for (i=0; i<MAX_M; i++) {
 			order[i] = i;

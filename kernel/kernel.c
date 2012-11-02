@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-11-02 07:02:21 Friday by lyzh>
+/* Last modified Time-stamp: <2012-11-02 23:00:56 Friday by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -86,8 +86,6 @@ extern unsigned char *arch_stack_init(void *tentry, void *parameter1, void *para
                       char *stack_low, char *stack_high, void *texit);
 static int            __insert_pend_list_and_trig( semaphore_t *semid, tcb_t *ptcb );
 static tcb_t *        __sem_wakeup_pender( semaphore_t *semid, int err);
-#define DEAD_LOCK_DETECT_EN 1
-#define DEAD_LOCK_SHOW_EN 1
 #if DEAD_LOCK_DETECT_EN
 static int            __mutex_dead_lock_detected( mutex_t * semid );
 #endif
@@ -494,7 +492,7 @@ int semb_take( semaphore_t *semid, unsigned int tick )
     int old;
     int TaskStatus = 0;
 
-#ifndef KERNEL_NO_ARG_CHECK
+#ifndef KERNEL_ARG_CHECK_EN
     if ( semid->type != SEM_TYPE_BINARY ) {
         return -EINVAL;
     }
@@ -516,25 +514,21 @@ int semb_take( semaphore_t *semid, unsigned int tick )
         TaskStatus = TASK_DELAY;
         softtimer_add( &ptcb_current->tick_node, tick );
     }
-    ptcb_current->psem_list      = &semid->pending_tasks;
-    ptcb_current->err          = 0;
-    ptcb_current->status = TASK_PENDING | TaskStatus;
+    ptcb_current->psem_list = &semid->pending_tasks;
+    ptcb_current->status    = TASK_PENDING | TaskStatus;
+    ptcb_current->err       = 0;
     __put_tcb_to_pendlist( semid, ptcb_current );
-again:
-    READY_Q_REMOVE( ptcb_current );
-    schedule_internel();
-    if ( ( ptcb_current->err==0|| ptcb_current->err==ETIME ) && semid->u.count ) {
-        semid->u.count = 0;
-        goto done;
-    }
-    if ( ptcb_current->err ) {/* semaphore is error. */
-        goto done;
-    }
-    goto again;
-done:
+    do {
+        READY_Q_REMOVE( ptcb_current );
+        schedule_internel();
+        if ( ( ptcb_current->err==0|| ptcb_current->err==ETIME ) && semid->u.count ) {
+            semid->u.count = 0;
+            break;
+        }
+    } while ( !ptcb_current->err );
 	list_del_init( &ptcb_current->sem_node );
 	ptcb_current->status    = TASK_READY;
-	ptcb_current->psem_list      = NULL;
+	ptcb_current->psem_list = NULL;
     softtimer_remove( &ptcb_current->tick_node );
     arch_interrupt_enable( old );
     return -ptcb_current->err;
@@ -558,7 +552,7 @@ int semc_take( semaphore_t *semid, unsigned int tick )
     int old;
     int TaskStatus = 0;
 
-#ifndef KERNEL_NO_ARG_CHECK
+#if KERNEL_ARG_CHECK_EN
     if ( unlikely(semid->type != SEM_TYPE_COUNTER) ) {
         return -1;
     }
@@ -584,18 +578,14 @@ int semc_take( semaphore_t *semid, unsigned int tick )
     ptcb_current->err          = 0;
     ptcb_current->status = TASK_PENDING | TaskStatus;
     __put_tcb_to_pendlist( semid, ptcb_current );
-again:
-    READY_Q_REMOVE( ptcb_current );
-    schedule_internel();
-    if ((ptcb_current->err==0||ptcb_current->err==ETIME) && semid->u.count ) {
-        semid->u.count--;
-        goto done;
-    }
-    if ( ptcb_current->err ) {
-        goto done;
-    }
-    goto again;
-done:
+    do {
+        READY_Q_REMOVE( ptcb_current );
+        schedule_internel();
+        if ((ptcb_current->err==0||ptcb_current->err==ETIME) && semid->u.count ) {
+            semid->u.count--;
+            break;
+        }
+    } while ( !ptcb_current->err );
 	ptcb_current->status    = TASK_READY;
 	list_del_init( &ptcb_current->sem_node );
 	ptcb_current->psem_list = NULL;
@@ -625,7 +615,7 @@ int mutex_lock( mutex_t *semid, unsigned int tick )
     int old;
     int TaskStatus = 0;
 
-#ifndef KERNEL_NO_ARG_CHECK
+#if KERNEL_ARG_CHECK_EN
     if ( unlikely(IS_INT_CONTEXT()) ) {
         return -EPERM;
     }
@@ -663,28 +653,24 @@ int mutex_lock( mutex_t *semid, unsigned int tick )
         TaskStatus = TASK_DELAY;
         softtimer_add( &ptcb_current->tick_node, tick );
     }
-    ptcb_current->status = TASK_PENDING | TaskStatus;
-    ptcb_current->psem_list      = &semid->s.pending_tasks;
-    ptcb_current->err          = 0;
+    ptcb_current->status    = TASK_PENDING | TaskStatus;
+    ptcb_current->psem_list = &semid->s.pending_tasks;
+    ptcb_current->err       = 0;
     /*
      *  put tcb into pend list and inherit priority.
      */
     if ( __insert_pend_list_and_trig( (semaphore_t*)semid, ptcb_current ) ) {
         __mutex_raise_owner_priority( semid, ptcb_current->current_priority );
     }
-  again:
-    READY_Q_REMOVE( ptcb_current );
-    schedule_internel();
-    if (( ptcb_current->err==0|| ptcb_current->err==ETIME ) &&  semid->s.u.owner == NULL ) {
-        __mutex_owner_set( semid, ptcb_current );
-        semid->mutex_recurse_count = 1;
-        goto done;
-    }
-    if ( ptcb_current->err ) {
-        goto done;
-    }
-    goto again;
-done:
+    do {
+        READY_Q_REMOVE( ptcb_current );
+        schedule_internel();
+        if (( ptcb_current->err==0|| ptcb_current->err==ETIME ) &&  semid->s.u.owner == NULL ) {
+            __mutex_owner_set( semid, ptcb_current );
+            semid->mutex_recurse_count = 1;
+            break;
+        }
+    } while ( !ptcb_current->err );
 	ptcb_current->status = TASK_READY;
 	list_del_init( &ptcb_current->sem_node );
 	ptcb_current->psem_list = NULL;
@@ -846,8 +832,8 @@ void __release_one_mutex( mutex_t *semid )
 }
 
 /*
- * »ñµÃsemidµÄµÈ´ý¶ÓÁÐµÄÓÅÏÈ¼¶¡£
- * ¶ÓÁÐµÄÓÅÏÈ¼¶¶¨ÒåÎª¸Ã¶ÓÁÐÖÐ×î¸ßµÄÓÅÏÈ¼¶µÄÊýÖµ¡£
+ * ï¿½ï¿½ï¿½semidï¿½ÄµÈ´ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½
+ * ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½Ã¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ßµï¿½ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½
  */
 static inline
 int __get_pend_list_priority ( semaphore_t *semid )
@@ -862,8 +848,8 @@ int __get_pend_list_priority ( semaphore_t *semid )
 }
 
 /*
- * »ñµÃsemidµÄµÈ´ý¶ÓÁÐµÄÓÅÏÈ¼¶¡£
- * ¶ÓÁÐµÄÓÅÏÈ¼¶¶¨ÒåÎª¸Ã¶ÓÁÐÖÐ×î¸ßµÄÓÅÏÈ¼¶µÄÊýÖµ¡£
+ * ï¿½ï¿½ï¿½semidï¿½ÄµÈ´ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½
+ * ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½ï¿½ï¿½Îªï¿½Ã¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ßµï¿½ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½
  */
 static inline
 int __get_mutex_hold_list_priority ( tcb_t *ptcb )
@@ -878,7 +864,7 @@ int __get_mutex_hold_list_priority ( tcb_t *ptcb )
 }
 
 /*
- * °ÑÈÎÎñ¿ØÖÆ¿é´æ·Åµ½¶ÓÁÐÖÐ¡£°´ÓÅÏÈ¼¶¸ßµ½µÍË³Ðò´æ·Å¡£
+ * ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¿ï¿½ï¿½Åµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¼ï¿½ï¿½ßµï¿½ï¿½ï¿½Ë³ï¿½ï¿½ï¿½Å¡ï¿½
  */
 static inline
 void __put_tcb_to_pendlist( semaphore_t *semid, tcb_t *ptcbToAdd )
@@ -897,7 +883,7 @@ void __put_tcb_to_pendlist( semaphore_t *semid, tcb_t *ptcbToAdd )
 }
 
 /*
- * ÉèÖÃ»¥³âÁ¿µÄËùÓÐÕß¡£
+ * ï¿½ï¿½ï¿½Ã»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß¡ï¿½
  */
 static
 int  __mutex_owner_set( mutex_t *semid, tcb_t *ptcbToAdd )
@@ -927,8 +913,8 @@ int  __mutex_owner_set( mutex_t *semid, tcb_t *ptcbToAdd )
 }
 
 /*
- * »½ÐÑsemidµÈ´ý¶ÓÁÐÖÐÓÅÏÈ¼¶×î¸ßµÄÈÎÎñ¡£»½ÐÑ²ÎÊýÎªerr.
- * µ±errÎª0Ê±£¬²»ÒÆ³ý¶¨Ê±Æ÷¡£
+ * ï¿½ï¿½ï¿½ï¿½semidï¿½È´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½ßµï¿½ï¿½ï¿½ï¿½ñ¡£»ï¿½ï¿½Ñ²ï¿½ï¿½ï¿½Îªerr.
+ * ï¿½ï¿½errÎª0Ê±ï¿½ï¿½ï¿½ï¿½ï¿½Æ³ï¿½Ê±ï¿½ï¿½ï¿½ï¿½
  */
 static
 tcb_t *__sem_wakeup_pender( semaphore_t *semid, int err )
@@ -956,8 +942,8 @@ tcb_t *__sem_wakeup_pender( semaphore_t *semid, int err )
 
 
 /**
- *  ÓÉÓÚptcbOwner->current_priorityµÄ±ä»¯¡£semidµÄpending_tasks¶ÓÁÐÐèÒªµ÷Õû.
- *  ·µ»Øµ÷Õûºó£¬ÊÇ·ñ¸ü¸ÄÁËÕû¸ö¶ÓÁÐµÄÓÅÏÈ¼¶(×î¸ßµÄÄÇ¸öÈÎÎñµÄÓÅÏÈ¼¶)¡£
+ *  ï¿½ï¿½ï¿½ï¿½ptcbOwner->current_priorityï¿½Ä±ä»¯ï¿½ï¿½semidï¿½ï¿½pending_tasksï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½.
+ *  ï¿½ï¿½ï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½È¼ï¿½(ï¿½ï¿½ßµï¿½ï¿½Ç¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¼ï¿½)ï¿½ï¿½
  */
 static
 int __resort_hold_mutex_list_and_trig( mutex_t *semid, tcb_t *ptcbOwner )
@@ -971,8 +957,8 @@ int __resort_hold_mutex_list_and_trig( mutex_t *semid, tcb_t *ptcbOwner )
 }
 
 /**
- *  ÓÉÓÚptcb->current_priorityµÄ±ä»¯¡£semidµÄpending_tasks¶ÓÁÐÐèÒªµ÷Õû.
- *  ·µ»Øµ÷Õûºó£¬ÊÇ·ñ¸ü¸ÄÁËÕû¸ö¶ÓÁÐµÄÓÅÏÈ¼¶(×î¸ßµÄÄÇ¸öÈÎÎñµÄÓÅÏÈ¼¶)¡£
+ *  ï¿½ï¿½ï¿½ï¿½ptcb->current_priorityï¿½Ä±ä»¯ï¿½ï¿½semidï¿½ï¿½pending_tasksï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½.
+ *  ï¿½ï¿½ï¿½Øµï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½È¼ï¿½(ï¿½ï¿½ßµï¿½ï¿½Ç¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È¼ï¿½)ï¿½ï¿½
  */
 static
 int __resort_pend_list_and_trig( semaphore_t *semid, tcb_t *ptcb )
@@ -986,7 +972,7 @@ int __resort_pend_list_and_trig( semaphore_t *semid, tcb_t *ptcb )
 }
 
 /**
- * °ÑÈÎÎñ¿ØÖÆ¿é²åÈëµ½semidµÄµÈ´ý¶ÓÁÐ¡£²¢·µ»ØÊÇ·ñ¸Ä±ä¶ÓÁÐµÄÓÅÏÈ¼¶¡£
+ * ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ¿ï¿½ï¿½ï¿½ëµ½semidï¿½ÄµÈ´ï¿½ï¿½ï¿½Ð¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½Ä±ï¿½ï¿½ï¿½Ðµï¿½ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½
  */
 static
 int __insert_pend_list_and_trig( semaphore_t *semid, tcb_t *ptcb )
@@ -1489,7 +1475,7 @@ int msgq_clear( msgq_t *pmsgq )
     pmsgq->rd             = pmsgq->wr = 0;
 
     n = 0;
-    while ( __sem_wakeup_pender(&pmsgq->sem_wr, 0) ) {
+    while ( __sem_wakeup_pender(&pmsgq->sem_wr, 0) && --pmsgq->sem_wr.u.count ) {
         n++;
     }
     if ( n && !IS_INT_CONTEXT() ) {

@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-11-02 07:53:30 Friday by lyzh>
+/* Last modified Time-stamp: <2012-11-02 22:33:28 Friday by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -67,9 +67,10 @@
         kprintf("ASSERT " #condiction "failed: " __FILE__ ":%d: " ": " "\r\n", __LINE__); \
         while (9);                                                      \
     }while (0)
+#define KERNEL_ARG_CHECK_EN 1
 #else
 #define ASSERT(condiction)  do{}while(0)
-#define KERNEL_NO_ARG_CHECK
+#define KERNEL_ARG_CHECK_EN 0
 #endif
 
 /**

@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-10-26 05:59:14 Friday by lyzh>
+/* Last modified Time-stamp: <2012-11-02 22:48:13 Friday by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -40,6 +40,10 @@
  * \hideinitializer
  */
 #define MAX_PRIORITY            255  /*!< must be <= 1023 and >=0 */
+
+#define DEAD_LOCK_DETECT_EN     1
+#define DEAD_LOCK_SHOW_EN       1
+
 
 
 /** @} */
