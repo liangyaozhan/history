@@ -39,7 +39,7 @@
  *
  * \hideinitializer
  */
-#define MAX_PRIORITY            7  /*!< must be <= 1023 and >=0 */
+#define MAX_PRIORITY            255  /*!< must be <= 1023 and >=0 */
 
 
 /** @} */

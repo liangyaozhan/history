@@ -197,7 +197,8 @@ typedef struct __msgq_t msgq_t;
 #define TASK_READY              0x00
 #define TASK_PENDING            0x01
 #define TASK_DELAY              0x02
-#define TASK_DEAD               0x04
+#define TASK_DEAD               0xF0
+#define TASK_PREPARED           0x5C
 /**
  *  @}
  */
@@ -350,6 +351,25 @@ int task_priority_set( tcb_t *ptcb, unsigned int priority );
  *  before calling this function.
  */
 void os_startup( void );
+
+/**
+ *  @brief set task priority 
+ *  @fn task_priority_set
+ *  @param[in]  ptcb            task control block pointor. If NULL, current task's
+ *                              priority will be change.
+ *  @param[in]  new_priority    new priority.
+ *  @return     0               successfully.
+ *  @return     -EINVAL         Invalid argument.
+ *
+ * new_priority:         P0       P1   P3
+ *                        |       |     |
+ *  0(high) ==============================================>> 256(low priority)
+ *                                ^
+ *                                |
+ *                         current priority
+ */
+int task_priority_set( tcb_t *ptcb, unsigned int priority );
+
 
 /**
  *  @brief stop a task and deinitialize.

@@ -53,30 +53,70 @@ static void led_task1( void *pa, void *pb)
 	}
 }
 
+#define MAX_T 20
+tcb_t *tcbs[MAX_T];
+#define MAX_M 30
+mutex_t mutexs[100];
+semaphore_t sem;
+
+static void swap( int *a, int *b)
+{
+	int c = *a;
+	*a = *b;
+	*b = c;
+}
+//#define mutex_lock(f,r) 0
+//#define mutex_unlock(f)
 void mtask( void )
 {
     int i;
     uint32_t total;
     uint32_t used;
     uint32_t max_used;
+    mutex_t *pm[MAX_M];
+    int order[MAX_M];
+    int n;
     int size;
+    int x, y;
     extern void memory_info(uint32_t *total, uint32_t *used, uint32_t *max_used);
     char *p;
-    
+    int ret;
+    //task_delay(1);
+    semb_take( &sem, -1 );
+
     while (1) {
+    	/*task_priority_set( tcbs[rand()%MAX_T], rand()%MAX_PRIORITY );*/
         size = rand()%100000;
+		for (i=0; i<MAX_M; i++) {
+			order[i] = i;
+		}
+        n = rand()%MAX_M;
+		for (i=0; i<n; i++) {
+			x = rand()%n;
+			y = rand()%n;
+			swap( &order[x], &order[y] );
+		}
+        for (i=0; i<n; i++ ) {
+        	pm[i] = &mutexs[ rand()%100 ];
+        	ret = mutex_lock( pm[i], /*rand()%100 + 100*/-1 );
+        	if ( ret ) {
+        		kprintf("%s: (%d)@%d mutex_lock error: ret=%d\n",CURRENT_TASK_NAME(), ptcb_current->priority, ptcb_current->current_priority, ret );
+        	}
+        }
         p = malloc( size );
         if ( p ) {
             memset(p, 0xff, size );
         }
-        
-        kprintf("malloc working...p=0x%X\n", p );
-        task_delay( rand() % 10000 );
-        memory_info( &total, &used, &max_used );
-        kprintf("malloc info: %d(%X) %d %d\n", total, total, used, max_used );
-        if ( p ) {
-            free(p);
+        kprintf("%s ...p=0x%X\n", CURRENT_TASK_NAME(), p );
+        task_delay( rand() % 200 );
+        for (i=0; i<n; i++ ){
+        	mutex_unlock( pm[order[n-1-i]] );
         }
+        memory_info( &total, &used, &max_used  );
+        kprintf("%s : (%d) running at %d malloc info: %d(%X) %d %d\n",CURRENT_TASK_NAME(), ptcb_current->priority, ptcb_current->current_priority, total, total, used, max_used );
+		if ( p ) {
+			free(p);
+		}
     }
 }
 
@@ -93,14 +133,15 @@ static void led_task( void *pa, void *pb)
         *(volatile int *)-1 = 0;
     }
 }
-
+int rtk_sprintf( char *buff, const char* str, ... );
 void main_task( void *pa, void *pb)
 {
     tcb_t      *ptcb;
     extern int  __sys_heap_start__;
     extern int  __sys_heap_end__;
     int         i = 0;
-    char name[32]="task0000";
+    char name[32];
+    int priority;
     
     bsp_init();
     system_heap_init( &__sys_heap_start__, &__sys_heap_end__ );
@@ -108,13 +149,24 @@ void main_task( void *pa, void *pb)
 	/* os_clk_init(); */
     kprintf("sizeof tcb=%d\n", sizeof(tcb_t));
 
-    task_delay( 5000 );
-
-    for (i = 0; i < 1000; i++) {
-        ptcb = task_create("malloc_tasking", 4, 1024, 0,mtask, 1,2 );
-        task_startup( ptcb );
+    for (i=0; i<sizeof(mutexs)/sizeof(mutexs[0]); i++) {
+    	mutex_init( &mutexs[i] );
     }
-    
+    semb_init( &sem, 0 );
+
+    for (i = 0; i < MAX_T; i++) {
+    	priority = rand()%MAX_PRIORITY;
+    	rtk_sprintf( name, "t%d-%d", i, priority );
+        ptcb = task_create(name, priority, 1024, 0, mtask, 1,2 );
+        tcbs[i] = ptcb;
+    }
+
+    task_delay( 200 );
+
+    for (i = 0; i < MAX_T; i++) {
+        task_startup( tcbs[i] );
+    }
+    semb_terminate( &sem );
 	while (9) {
 		rand();
 		rand();
