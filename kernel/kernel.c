@@ -189,12 +189,16 @@ int priority_q_remove( pqn_t *pNode )
 void task_delay( int tick )
 {
     int old;
+    int last;
 
     old = arch_interrupt_disable();
     READY_Q_REMOVE( ptcb_current );
-    ptcb_current->status |= TASK_DELAY;
+    last = ptcb_current->err;
+    ptcb_current->status = TASK_DELAY;
     softtimer_add( &ptcb_current->tick_node, tick );
     schedule_internel();
+    ptcb_current->err = last;
+    ptcb_current->status = TASK_READY;
     arch_interrupt_enable(old);
 }
 
