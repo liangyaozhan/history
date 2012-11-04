@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-11-02 23:00:56 Friday by lyzh>
+/* Last modified Time-stamp: <2012-11-04 09:46:45 Sunday by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -25,8 +25,8 @@
 #define PRIO_NODE_TO_PTCB(pNode)        list_entry(pNode, tcb_t, prio_node)
 #define TICK_NODE_TO_PTCB(pNode)        list_entry(pNode, tcb_t, tick_node)
 #define PEND_NODE_TO_PTCB(pNode)        list_entry(pNode, tcb_t, sem_node)
-#define READY_Q_REMOVE( ptcb )          priority_q_remove( &g_readyq, &(ptcb)->prio_node )
-#define READY_Q_PUT( ptcb, key)         priority_q_put(&g_readyq, &(ptcb)->prio_node, key)
+#define READY_Q_REMOVE( ptcb )          priority_q_remove( &(ptcb)->prio_node )
+#define READY_Q_PUT( ptcb, key)         priority_q_put(&(ptcb)->prio_node, key)
 #define DELAY_Q_PUT(ptcb, tick)         softtimer_add( &(ptcb)->tick_node, tick )
 #define DELAY_Q_REMOVE(ptcb)            softtimer_remove( &(ptcb)->tick_node )
 #define PLIST_PTR_TO_SEMID( ptr )       list_entry( (ptr), semaphore_t, pending_tasks )
@@ -69,9 +69,9 @@ static inline int     __get_pend_list_priority ( semaphore_t *semid );
 static inline int     __get_mutex_hold_list_priority ( tcb_t *ptcb );
 static void           __restore_current_task_priority( mutex_t *semid );
 static void           task_delay_timeout( softtimer_t *pdn );
-static void           priority_q_init( priority_q_bitmap_head_t *pqriHead );
-static int            priority_q_put( priority_q_bitmap_head_t *pqHead, pqn_t *pNode, int key );
-static int            priority_q_remove( priority_q_bitmap_head_t *pqHead, pqn_t *pNode );
+static void           priority_q_init( void );
+static int            priority_q_put( pqn_t *pNode, int key );
+static int            priority_q_remove( pqn_t *pNode );
 static void           softtimer_set_func( softtimer_t *pNode, void (*func)(softtimer_t *) );
 static void           softtimer_add(softtimer_t *pdn, unsigned int uiTick);
 static void           softtimer_remove ( softtimer_t *pdn );
@@ -94,8 +94,9 @@ void                  __mutex_dead_lock_show( mutex_t *mutex );
 #endif
 
 static
-void priority_q_init( priority_q_bitmap_head_t *pqriHead )
+void priority_q_init( void )
 {
+    priority_q_bitmap_head_t *pqriHead = &g_readyq;
     int i;
 
     pqriHead->phighest_node = NULL;
@@ -129,7 +130,7 @@ void priority_q_bitmap_clear( priority_q_bitmap_head_t *pqriHead, int priority )
     }
 }
 
-static
+static inline
 pqn_t *priority_q_highest_get( priority_q_bitmap_head_t *pqHead )
 {
     int      index;
@@ -139,16 +140,23 @@ pqn_t *priority_q_highest_get( priority_q_bitmap_head_t *pqHead )
         return NULL;
     }
     
-    i = ffs( pqHead->bitmap_group ) - 1;
-    index = ffs( pqHead->bitmap_tasks[i] ) + (i << 5) - 1;
+    i = rtk_ffs( pqHead->bitmap_group ) - 1;
+    index = rtk_ffs( pqHead->bitmap_tasks[i] ) + (i << 5) - 1;
     return list_entry( LIST_FIRST( &pqHead->tasks[ index ] ), pqn_t, node);
 }
 
-int priority_q_put( priority_q_bitmap_head_t *pqHead, pqn_t *pNode, int key )
+int priority_q_put( pqn_t *pNode, int key )
 {
-    ASSERT( key <= MAX_PRIORITY && key >= 0 );
-    ASSERT( NULL != pqHead && pNode != NULL );
-    
+    register priority_q_bitmap_head_t *pqHead = &g_readyq;
+
+    /* cannot put more than once time, but, if key not the same, we change it.  */
+    if ( unlikely(!list_empty(&pNode->node)) ) {
+        if ( pNode->key == key ) {
+            return -1;
+        } else {
+            priority_q_remove( pNode );
+        }
+    }
     pNode->key = key;
     priority_q_bitmap_set( pqHead, key );
     list_add_tail( &pNode->node, &pqHead->tasks[key] );
@@ -162,19 +170,16 @@ int priority_q_put( priority_q_bitmap_head_t *pqHead, pqn_t *pNode, int key )
     return 0;
 }
 
-int priority_q_remove( priority_q_bitmap_head_t *pqHead, pqn_t *pNode )
+int priority_q_remove( pqn_t *pNode )
 {
+    register priority_q_bitmap_head_t *pqHead = &g_readyq;
     int key;
     
-    ASSERT( NULL != pqHead && pNode != NULL );
-
     key = pNode->key;
-
     list_del_init( &pNode->node );
     if ( list_empty( &pqHead->tasks[key] ) ) {
         priority_q_bitmap_clear( pqHead, key );
     }
-
     if ( pqHead->phighest_node == pNode  ) {
         pqHead->phighest_node = priority_q_highest_get( pqHead );
     }
@@ -1302,7 +1307,7 @@ void kernel_init( void )
     
     INIT_LIST_HEAD( &g_systerm_tasks_head );
     INIT_LIST_HEAD(&g_softtime_head);
-    priority_q_init( &g_readyq );
+    priority_q_init();
     TASK_INIT( "idle", info1, MAX_PRIORITY, task_idle, 0,0 );
     TASK_STARTUP(info1);
 }

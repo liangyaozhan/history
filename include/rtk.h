@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-11-02 22:33:28 Friday by lyzh>
+/* Last modified Time-stamp: <2012-11-04 09:59:31 Sunday by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -690,13 +690,11 @@ int msgq_terminate( msgq_t *pmsgq );
  *  @param buff_size the buffer size.
  *  @param tick      the max time to wait if there is no message.
  *                   if pass -1 to this, it will wait forever.
- *  @param flag      0: copy the msg to the buffer and then remove it.
- *                   1: copy the msg to the buffer, but do not remove it.
  *  @retval -1       error, please check errno. if errno == ETIME, it means Timer expired,
  *                   if errno == ENOMEM, it mean buffer_size if not enough.
  *  @retval 0        recieve successfully.
  */
-int msgq_recieve( msgq_t *pmsgq, void *buff, int buff_size, int tick, int flag );
+int msgq_receive( msgq_t *pmsgq, void *buff, int buff_size, int tick );
 
 /**
  *  @brief send message to a the message Q.
@@ -755,7 +753,7 @@ extern tcb_t *ptcb_current;
 /**
  *  @brief Find First bit Set
  */
-int ffs( unsigned int q );
+int rtk_ffs( register unsigned int q );
 
 /**
  *  @brief standard memcpy

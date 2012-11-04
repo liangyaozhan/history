@@ -188,3 +188,12 @@ HardFault_Handler:
 arch_interrupt_check:
 	MRS     R0, IPSR
 	BX		LR
+
+    .global rtk_ffs
+    .type rtk_ffs, %function
+rtk_ffs:    
+    RBIT R0,R0
+	CLZ  R0,R0
+    ADD  R0, #1
+    BX      LR
+    

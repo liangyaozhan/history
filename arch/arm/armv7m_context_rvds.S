@@ -195,8 +195,8 @@ HardFault_Handler    PROC
     BX      lr
     ENDP
 
-    EXPORT ffs
-ffs    PROC
+    EXPORT rtk_ffs
+rtk_ffs    PROC
     rbit r0,r0
 	clz  r0,r0
     add  r0, #1
