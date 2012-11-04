@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-11-04 09:46:45 Sunday by lyzh>
+/* Last modified Time-stamp: <2012-11-04 12:58:58 Sunday by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -85,7 +85,7 @@ static int            __mutex_raise_owner_priority( mutex_t *semid, int priority
 extern unsigned char *arch_stack_init(void *tentry, void *parameter1, void *parameter2,
                       char *stack_low, char *stack_high, void *texit);
 static int            __insert_pend_list_and_trig( semaphore_t *semid, tcb_t *ptcb );
-static tcb_t *        __sem_wakeup_pender( semaphore_t *semid, int err);
+static int            __sem_wakeup_pender( semaphore_t *semid, int err, int count );
 #if DEAD_LOCK_DETECT_EN
 static int            __mutex_dead_lock_detected( mutex_t * semid );
 #endif
@@ -151,7 +151,7 @@ int priority_q_put( pqn_t *pNode, int key )
 
     /* cannot put more than once time, but, if key not the same, we change it.  */
     if ( unlikely(!list_empty(&pNode->node)) ) {
-        if ( pNode->key == key ) {
+        if ( likely(pNode->key == key) ) {
             return -1;
         } else {
             priority_q_remove( pNode );
@@ -164,7 +164,7 @@ int priority_q_put( pqn_t *pNode, int key )
     /*
      *  set high node
      */
-    if ( (NULL == pqHead->phighest_node) || (key < pqHead->phighest_node->key) ) {
+    if ( unlikely(NULL == pqHead->phighest_node) || (key < pqHead->phighest_node->key) ) {
         pqHead->phighest_node = pNode;
     }
     return 0;
@@ -407,9 +407,7 @@ int __sem_terminate( semaphore_t *semid )
     int               happen = 0;
 
     old = arch_interrupt_disable();
-    while (__sem_wakeup_pender(semid, ENXIO)) {
-        happen++;
-    }
+    happen = __sem_wakeup_pender(semid, ENXIO, -1 );
     if ( happen ) {
         schedule_internel();
     }
@@ -790,7 +788,7 @@ int semb_give( semaphore_t *semid )
     old = arch_interrupt_disable();
     
     semid->u.count = 1;
-    if ( __sem_wakeup_pender( semid, 0 ) && !IS_INT_CONTEXT() ) {
+    if ( __sem_wakeup_pender( semid, 0, 1 ) && !IS_INT_CONTEXT() ) {
         schedule_internel();
     }
     arch_interrupt_enable(old );
@@ -821,7 +819,7 @@ int semc_give( semaphore_t *semid )
         arch_interrupt_enable(old );
         return -ENOSPC;
     }
-    if ( __sem_wakeup_pender( semid, 0 ) && !IS_INT_CONTEXT() ) {
+    if ( __sem_wakeup_pender( semid, 0, 1 ) && !IS_INT_CONTEXT() ) {
         schedule_internel();
     }
     arch_interrupt_enable(old );
@@ -832,7 +830,7 @@ int semc_give( semaphore_t *semid )
 static
 void __release_one_mutex( mutex_t *semid )
 {
-    __sem_wakeup_pender( (semaphore_t*)semid, 0 );
+    __sem_wakeup_pender( (semaphore_t*)semid, 0, 1 );
     __mutex_owner_set( semid, NULL );
 }
 
@@ -922,27 +920,28 @@ int  __mutex_owner_set( mutex_t *semid, tcb_t *ptcbToAdd )
  * ��errΪ0ʱ�����Ƴ�ʱ����
  */
 static
-tcb_t *__sem_wakeup_pender( semaphore_t *semid, int err )
+int __sem_wakeup_pender( semaphore_t *semid, int err, int count )
 {
-    struct list_head *p;
-    tcb_t            *ptcbwakeup;
+    register int               n;
+    register struct list_head *p;
+    register struct list_head *save;
+    register tcb_t            *ptcbwakeup;
 
-    if ( list_empty(&semid->pending_tasks) ) {
-        return NULL;
+    n = 0;
+    list_for_each_safe( p, save, &semid->pending_tasks ) {
+        ptcbwakeup = PEND_NODE_TO_PTCB( p );
+        if ( err ) {
+            /* remove timer only error. Otherwise */
+            softtimer_remove( &ptcbwakeup->tick_node );
+            list_del_init( &ptcbwakeup->sem_node );
+        }
+        READY_Q_PUT( ptcbwakeup, ptcbwakeup->current_priority );
+        ptcbwakeup->err = err;
+        if ( ++n == count ) {
+            break;
+        }
     }
-    p = LIST_FIRST( &semid->pending_tasks );
-
-    ptcbwakeup         = PEND_NODE_TO_PTCB( p );
-    /*
-     *  remove timer only error. Otherwise, 
-     */
-    if ( err ) {
-        softtimer_remove( &ptcbwakeup->tick_node );
-        list_del_init( &ptcbwakeup->sem_node );
-    }
-    READY_Q_PUT( ptcbwakeup, ptcbwakeup->current_priority );
-    ptcbwakeup->err       = err;
-    return ptcbwakeup;
+    return n;
 }
 
 
@@ -1479,10 +1478,8 @@ int msgq_clear( msgq_t *pmsgq )
     pmsgq->sem_rd.u.count = 0;
     pmsgq->rd             = pmsgq->wr = 0;
 
-    n = 0;
-    while ( __sem_wakeup_pender(&pmsgq->sem_wr, 0) && --pmsgq->sem_wr.u.count ) {
-        n++;
-    }
+    n = __sem_wakeup_pender(&pmsgq->sem_wr, 0, pmsgq->sem_wr.u.count ) ;
+    
     if ( n && !IS_INT_CONTEXT() ) {
         schedule_internel();
     }
