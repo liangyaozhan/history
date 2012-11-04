@@ -43,7 +43,7 @@ static void uart_task( char *pa, void *pb)
     int rx;
     
 	while (9) {
-        if ( 0 == msgq_recieve( (msgq_t*)&test_msgq, &rx, sizeof (int), -1, 0 ) ) {
+        if ( 0 == msgq_receive( (msgq_t*)&test_msgq, &rx, sizeof (int), -1 ) ) {
             kprintf( "uart task %s pri=%d msgq recieve : %d\n", (char*)pa, CURRENT_TASK_PRIORITY(), rx );
         }
 	}

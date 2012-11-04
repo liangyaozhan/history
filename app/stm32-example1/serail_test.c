@@ -17,7 +17,7 @@ int uart_send_stream( char *p, int len);
 
 int uart_get_char( char *pc, int tick )
 {
-    return msgq_recieve( (msgq_t*)&uart_msgq_rx, pc, sizeof(char), tick, 0);
+    return msgq_receive( (msgq_t*)&uart_msgq_rx, pc, sizeof(char), tick);
 }
 
 int uart_putchar( char c )
@@ -27,7 +27,7 @@ int uart_putchar( char c )
     ret = msgq_send( &uart_msgq_tx, &c, 1, -1 );
     if ( USART_GetFlagStatus( USART1, USART_FLAG_TXE ) == SET ) {
         char d;
-        ret = msgq_recieve( &uart_msgq_tx, &d, 1, 0, 0);
+        ret = msgq_receive( &uart_msgq_tx, &d, 1, 0);
         if ( ret == 0 ) {
             USART_SendData( USART1, d );
         }
@@ -60,7 +60,7 @@ void USART1_IRQHandler(void)
         int ret;
         char c;
 
-        ret = msgq_recieve( &uart_msgq_tx, &c, 1, 0, 0 );
+        ret = msgq_receive( &uart_msgq_tx, &c, 1, 0);
         if ( ret == 0 ) {
             /* Write one byte to the transmit data register */
             USART_SendData(USART1, c);

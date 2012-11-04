@@ -53,10 +53,10 @@ static void led_task1( void *pa, void *pb)
 	}
 }
 
-#define MAX_T 20
+#define MAX_T 1000
 tcb_t *tcbs[MAX_T];
-#define MAX_M 30
-mutex_t mutexs[100];
+#define MAX_M 50
+mutex_t mutexs[1000];
 semaphore_t sem;
 
 static void swap( int *a, int *b)
@@ -83,7 +83,7 @@ void mtask( void )
     int ret;
     
     while (1) {
-    	task_priority_set( tcbs[rand()%MAX_T], rand()%MAX_PRIORITY );
+    	task_priority_set(  tcbs[rand()%MAX_T], rand()%MAX_PRIORITY );
         size = rand()%100000;
 		for (i=0; i<MAX_M; i++) {
 			order[i] = i;
@@ -95,26 +95,26 @@ void mtask( void )
 			swap( &order[x], &order[y] );
 		}
         for (i=0; i<n; i++ ) {
-        	pm[i] = &mutexs[ rand()%100 ];
+        	pm[i] = &mutexs[ rand()%(sizeof(mutexs)/sizeof(mutexs[0])) ];
         	ret = mutex_lock( pm[i], /*rand()%100 + 100*/-1 );
         	if ( ret ) {
         		kprintf("%s: (%d)@%d mutex_lock error: ret=%d\n",CURRENT_TASK_NAME(), ptcb_current->priority, ptcb_current->current_priority, ret );
         	}
         }
-        p = malloc( size );
-        if ( p ) {
-            memset(p, 0xff, size );
-        }
-        kprintf("%s ...p=0x%X\n", CURRENT_TASK_NAME(), p );
-        task_delay( rand() % 200 );
+        //p = malloc( size );
+        //if ( p ) {
+        //    memset(p, 0xff, size );
+        //}
+        //kprintf("%s ...p=0x%X\n", CURRENT_TASK_NAME(), p );
+        task_delay( rand() % 50 );
         for (i=0; i<n; i++ ){
         	mutex_unlock( pm[order[n-1-i]] );
         }
         memory_info( &total, &used, &max_used  );
         kprintf("%s : (%d) running at %d malloc info: %d(%X) %d %d\n",CURRENT_TASK_NAME(), ptcb_current->priority, ptcb_current->current_priority, total, total, used, max_used );
-		if ( p ) {
-			free(p);
-		}
+		//if ( p ) {
+		//	free(p);
+		//}
     }
 }
 
@@ -155,11 +155,11 @@ void main_task( void *pa, void *pb)
     for (i = 0; i < MAX_T; i++) {
     	priority = rand()%MAX_PRIORITY;
     	rtk_sprintf( name, "t%d-%d", i, priority );
-        ptcb = task_create(name, priority, 1024, 0, mtask, 1,2 );
+        ptcb = task_create(name, priority, 1024*32, 0, mtask, 1,2 );
         tcbs[i] = ptcb;
     }
 
-    task_delay( 200 );
+    task_delay( 500 );
 
     for (i = 0; i < MAX_T; i++) {
         task_startup( tcbs[i] );
