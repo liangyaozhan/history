@@ -43,6 +43,8 @@
 #include "s3c2440_int.h"
 #include "s3c2440_timer.h"
 
+void lcd_init(void);
+
 /*
  * 初始化 CPU
  */
@@ -54,7 +56,6 @@ static void cpu_init(void)
 
     INTSUBMSK   = BIT_SUB_ALLMSK;                                       /*  屏蔽所有子中断              */
 }
-
 /*
  * 初始化 BSP
  */
@@ -69,5 +70,7 @@ void bsp_init(void)
     interrupt_init();
     
     timer_init();
+
+    lcd_init();
 }
 

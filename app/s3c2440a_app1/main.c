@@ -83,7 +83,7 @@ void mtask( void )
     int ret;
     
     while (1) {
-    	task_priority_set(  tcbs[rand()%MAX_T], rand()%MAX_PRIORITY );
+    	task_priority_set(  tcbs[rand()%MAX_T], rand()%(MAX_PRIORITY-1) );
         size = rand()%100000;
 		for (i=0; i<MAX_M; i++) {
 			order[i] = i;
@@ -132,6 +132,9 @@ static void led_task( void *pa, void *pb)
     }
 }
 int rtk_sprintf( char *buff, const char* str, ... );
+    void * fb_open( void );
+
+
 void main_task( void *pa, void *pb)
 {
     tcb_t      *ptcb;
@@ -140,6 +143,10 @@ void main_task( void *pa, void *pb)
     int         i = 0;
     char name[32];
     int priority;
+    unsigned short *frame_buffer;
+    int x;
+    int y;
+    unsigned short color;
     
     bsp_init();
     system_heap_init( &__sys_heap_start__, &__sys_heap_end__ );
@@ -153,24 +160,28 @@ void main_task( void *pa, void *pb)
     semb_init( &sem, 0 );
 
     for (i = 0; i < MAX_T; i++) {
-    	priority = rand()%MAX_PRIORITY;
+    	priority = rand()%(MAX_PRIORITY-1);
     	rtk_sprintf( name, "t%d-%d", i, priority );
         ptcb = task_create(name, priority, 1024*32, 0, mtask, 1,2 );
         tcbs[i] = ptcb;
     }
 
     task_delay( 500 );
+    frame_buffer = fb_open();
 
     for (i = 0; i < MAX_T; i++) {
         task_startup( tcbs[i] );
     }
     semb_terminate( &sem );
+    task_priority_set( NULL, MAX_PRIORITY );
 	while (9) {
-		rand();
-		rand();
-		rand();
-		task_delay(10);
-        kprintf("hello world %d\n", i++);
+		for (x=0; x<240; x++) {
+			for (y=0; y<320; y++) {
+				color = rand();
+				*(frame_buffer+x+y*240) = color;
+			}
+		}
+
 	}
 }
 

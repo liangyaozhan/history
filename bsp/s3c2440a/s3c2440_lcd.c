@@ -38,7 +38,6 @@
 **
 *********************************************************************************************************/
 #include <stdint.h>
-#include <ppos/iosysterm.h>
 #include "s3c2440.h"
 /*
  * 扩展阅读:
@@ -158,55 +157,29 @@ static void __lcd_init(void)
     TPAL      = 0x00;                                                   /*  不使用调色板                */
 }
 
-#include <sys/stat.h>
 
 /*
  * 打开 FrameBuffer
  */
-static int fb_open(drv_entry_t *pentry, char *name, int f, int m )
+void * fb_open( void )
 {
     LCDCON1 = (LCDCON1 & ~(1)) | ENVID;                                 /*  开启视频输出                */
-	int fd;
-
-	fd = fd_alloc( NULL, pentry );
-	return fd;
+    return framebuffer;
 }
 
 /*
  * 关闭 FrameBuffer
  */
-static int fb_close( drv_entry_t *pentry, int fd )
+int fb_close( void )
 {
     LCDCON1 = (LCDCON1 & ~(1)) | 0;                                     /*  关闭视频输出                */
-	return fd_free(fd);
+    return 0;
 }
-
-/* /\* */
-/*  * 获得 FrameBuffer 状态 */
-/*  *\/ */
-/* static int fb_fstat(void *ctx, file_t *file, struct stat *buf) */
-/* { */
-/*     buf->st_size = sizeof(framebuffer); */
-
-/*     return 0; */
-/* } */
-
-
-static struct io_operation fb_op = {
-    .open = fb_open,                   /* open */
-    .close = fb_close,                  /* close */
-};
-
-static drv_entry_t __lcd_drv = {
-    .name       = "/dev/fb0",
-    .poperation = &fb_op
-};
 
 
 void lcd_init(void)
 {
     __lcd_init();
-    iosDrvInstall( & __lcd_drv );
 }
 
     

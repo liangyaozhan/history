@@ -36,6 +36,7 @@ include $(RTK_BASE)/makefiles/config.mk
 #COBJS   := $(patsubst %.c,%.o,$(wildcard *.c)) 
 COBJS   := mmu-armarchv4.o mmu_setup.o
 COBJS   += s3c2440_clock.o	s3c2440_int.o s3c2440_timer.o serial.o s3c2440_uart.o s3c2440.o
+COBJS   += s3c2440_lcd.o
 CPPOBJS := $(patsubst %.cpp,%.o,$(wildcard *.cpp)) 
 SOBJS   := $(patsubst %.S,%.o,$(wildcard *.S))
 
