@@ -1,0 +1,4 @@
+
+target remote localhost:1234
+load ../../app/s3c2440a_app1/output/arm920trelease/rtk.elf
+continue
