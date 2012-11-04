@@ -64,7 +64,7 @@ EX_CLEAN_FILE +=
 #         subdir2:subdir1
 # 可以写在当前目录的dircfg.mk
 #
-stm32f10x-apps := stm32-example1  stm32-example2 can
+stm32f10x-apps := stm32-example1  stm32-example2
 s3c2440a-apps := s3c2440a_app1
 
 ifeq ($(findstring clean,$(MAKECMDGOALS)),clean)
