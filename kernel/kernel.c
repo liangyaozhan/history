@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-11-05 16:05:26 Monday by liangyaozhan>
+/* Last modified Time-stamp: <2012-11-05 20:53:14 Monday by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -402,15 +402,16 @@ int semc_take( semaphore_t *semid, unsigned int tick )
         TaskStatus = TASK_DELAY;
         softtimer_add( &ptcb_current->tick_node, tick );
     }
-    ptcb_current->psem_list      = &semid->pending_tasks;
-    ptcb_current->err          = 0;
-    ptcb_current->status = TASK_PENDING | TaskStatus;
+    ptcb_current->psem_list = &semid->pending_tasks;
+    ptcb_current->err       = 0;
+    ptcb_current->status    = TASK_PENDING | TaskStatus;
     __put_tcb_to_pendlist( semid, ptcb_current );
     do {
         READY_Q_REMOVE( ptcb_current );
         schedule_internel();
         if ((ptcb_current->err==0||ptcb_current->err==ETIME) && semid->u.count ) {
             semid->u.count--;
+            ptcb_current->err = 0;
             break;
         }
     } while ( !ptcb_current->err );
@@ -497,7 +498,7 @@ int semb_init( semaphore_t *semid, int initcount )
 {
     __sem_init_common( semid );
     semid->u.count = !!initcount;
-    semid->type  = SEM_TYPE_BINARY;
+    semid->type    = SEM_TYPE_BINARY;
     return 0;
 }
 
@@ -550,7 +551,8 @@ int semb_take( semaphore_t *semid, unsigned int tick )
         READY_Q_REMOVE( ptcb_current );
         schedule_internel();
         if ( ( ptcb_current->err==0|| ptcb_current->err==ETIME ) && semid->u.count ) {
-            semid->u.count = 0;
+            semid->u.count    = 0;
+            ptcb_current->err = 0;
             break;
         }
     } while ( !ptcb_current->err );
@@ -720,7 +722,7 @@ int mutex_lock( mutex_t *semid, unsigned int tick )
             break;
         }
     } while ( !ptcb_current->err );
-    ptcb_current->status = TASK_READY;
+    ptcb_current->status    = TASK_READY;
     list_del_init( &ptcb_current->sem_node );
     ptcb_current->psem_list = NULL;
     softtimer_remove( &ptcb_current->tick_node );
@@ -1268,7 +1270,7 @@ void schedule( void )
     if ( p != ptcb_current ){
         arch_context_switch( &ptcb_current->sp, &p->sp);        
     }
-  done:
+done:
     arch_interrupt_enable(old);
 }
 
