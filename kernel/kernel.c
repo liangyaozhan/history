@@ -64,10 +64,7 @@ struct list_head                 g_systerm_tasks_head;
 
 void *memcpy(void*,const void*,int);
 static inline void    __put_tcb_to_pendlist( semaphore_t *semid, tcb_t *ptcbToAdd );
-static int            __mutex_owner_set( mutex_t *semid, tcb_t *ptcbToAdd );
 static inline int     __get_pend_list_priority ( semaphore_t *semid );
-static inline int     __get_mutex_hold_list_priority ( tcb_t *ptcb );
-static void           __restore_current_task_priority( mutex_t *semid );
 static void           task_delay_timeout( softtimer_t *pdn );
 static void           priority_q_init( void );
 static int            priority_q_put( pqn_t *pNode, int key );
@@ -76,15 +73,20 @@ static void           softtimer_set_func( softtimer_t *pNode, void (*func)(softt
 static void           softtimer_add(softtimer_t *pdn, unsigned int uiTick);
 static void           softtimer_remove ( softtimer_t *pdn );
 void                  softtimer_announce( void );
+#if CONFIG_MUTEX_EN
+static void           __restore_current_task_priority( mutex_t *semid );
+static int            __mutex_owner_set( mutex_t *semid, tcb_t *ptcbToAdd );
+static inline int     __get_mutex_hold_list_priority ( tcb_t *ptcb );
 static void           __release_one_mutex( mutex_t *semid );
+static int            __mutex_raise_owner_priority( mutex_t *semid, int priority );
+static int            __insert_pend_list_and_trig( semaphore_t *semid, tcb_t *ptcb );
+#endif
 static tcb_t         *highest_tcb_get( void );
 extern void           arch_context_switch(void **fromsp, void **tosp);
 void                  arch_context_switch_to(void **sp);
 static void           schedule_internel( void );
-static int            __mutex_raise_owner_priority( mutex_t *semid, int priority );
 extern unsigned char *arch_stack_init(void *tentry, void *parameter1, void *parameter2,
                       char *stack_low, char *stack_high, void *texit);
-static int            __insert_pend_list_and_trig( semaphore_t *semid, tcb_t *ptcb );
 static int            __sem_wakeup_pender( semaphore_t *semid, int err, int count );
 #if CONFIG_DEAD_LOCK_DETECT_EN
 static int            __mutex_dead_lock_detected( mutex_t * semid );
@@ -846,8 +848,6 @@ void __release_one_mutex( mutex_t *semid )
 }
 #endif /* CONFIG_MUTEX_EN */
 
-/*
- * 锟斤拷锟絪emid锟侥等达拷锟斤拷械锟斤拷锟斤拷燃锟斤拷锟�?* 锟斤拷锟叫碉拷锟斤拷锟饺硷拷锟斤拷锟斤拷为锟矫讹拷锟斤拷锟斤拷锟斤拷叩锟斤拷锟斤拷燃锟斤拷锟斤拷锟街碉拷锟� */
 static inline
 int __get_pend_list_priority ( semaphore_t *semid )
 {
@@ -1094,6 +1094,8 @@ int task_priority_set( tcb_t *ptcb, unsigned int priority )
         if ( trig && semid->type == SEM_TYPE_MUTEX ) {
             need = __mutex_raise_owner_priority( (mutex_t*)semid, ptcb->current_priority );
         }
+#else
+        (void)trig;
 #endif
     }
 
@@ -1199,7 +1201,9 @@ int task_terminate( tcb_t *ptcb )
 {
     int old;
     int ret = 0;
+#if CONFIG_MUTEX_EN
     struct list_head *save, *p;
+#endif
 
     if ( ptcb == NULL ) {
         ptcb = ptcb_current;
