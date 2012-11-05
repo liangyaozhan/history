@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-11-04 12:38:19 Sunday by lyzh>
+/* Last modified Time-stamp: <2012-11-05 16:05:54 Monday by liangyaozhan>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -125,13 +125,17 @@ struct __tcb_t
     softtimer_t       tick_node;            /*!< node in softtimer Q    */
     struct list_head  sem_node;             /*!< node in pending Q      */
     struct list_head *psem_list;            /*!< pend node if any       */
+#if CONFIG_MUTEX_EN
     struct list_head  mutex_holded_head;    /*!< remember all mutex     */
+    int               priority;             /*!< normal priority        */
+#endif
     struct list_head  task_list_node;       /*!< node in task list      */
     int               option;               /*!< for the further        */
     int               current_priority;     /*!< running priority       */
-    int               priority;             /*!< normal priority        */
     int               err;                  /*!< errno used internal    */
+#if CONFIG_TASK_TERMINATE_EN
     int               safe_count;           /*!< prevent task deletion  */
+#endif
     int               status;                             /*!< task status            */
 };
 
@@ -361,6 +365,7 @@ void os_startup( void );
  *  @param[in]  new_priority    new priority.
  *  @return     0               successfully.
  *  @return     -EINVAL         Invalid argument.
+ *  @return     -EPERM          Permission denied. The task is not startup yet.
  *
  * new_priority:         P0       P1   P3
  *                        |       |     |
@@ -441,11 +446,11 @@ int task_unsafe( void );
  *  @endcode
  */
 #define SEM_DECL( sem, t, init)                 \
-	semaphore_t sem; semaphore_t sem = {                         \
-		{init},                                 \
-		LIST_HEAD_INIT(sem.pending_tasks),      \
+    semaphore_t sem; semaphore_t sem = {                         \
+        {init},                                 \
+        LIST_HEAD_INIT(sem.pending_tasks),      \
         t,                                      \
-	}
+    }
 
 /**
  *  @brief semaphore binary declaration macro.

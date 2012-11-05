@@ -97,7 +97,9 @@
  * 视频帧缓冲
  */
 static uint16_t framebuffer[LINEVAL][HOZVAL];
+static uint16_t framebuffer2[LINEVAL][HOZVAL];
 
+void lcd_set_frame_buffer( unsigned short *b );
 /*
  * 初始化 LCD
  */
@@ -140,23 +142,26 @@ static void __lcd_init(void)
     LCDCON5 = (LCDCON5 & ~(1 <<  1)) | BSWP      <<  1;                 /*  字节是否交换                */
     LCDCON5 = (LCDCON5 & ~(1 <<  0)) | HWSWP     <<  0;                 /*  半字是否交换                */
 
-    /* 视频帧缓冲区内存地址高位[30:22]  -> LCDSADDR1[29:21] */
-    LCDSADDR1 = (LCDSADDR1 & ~(0x1FF << 21)) | (((uint32_t)framebuffer >> 22) & 0x1FF) << 21;
-
-    /* 视频帧缓冲区内存地址低位[21:1]   -> LCDSADDR1[20:0] */
-    LCDSADDR1 = (LCDSADDR1 & ~(0x1FFFFF)) | (((uint32_t)framebuffer >> 1) & 0x1FFFFF);
-
-    /* 视频帧缓冲区的结束地址低位[21:1] -> LCDSADDR2[20:0] */
-    LCDSADDR2 = (LCDSADDR2 & ~(0x1FFFFF)) | ((((uint32_t)framebuffer + LINEVAL * HOZVAL * 2) >> 1) & 0x1FFFFF);
-
     LCDSADDR3 = (LCDSADDR3 & ~(0x7FF << 11)) | OFFSIZE << 11;           /*  虚拟屏幕偏移大小            */
     LCDSADDR3 = (LCDSADDR3 & ~(0x7FF)) | PAGEWIDTH;                     /*  虚拟屏幕宽度                */
-
+    lcd_set_frame_buffer(framebuffer);
     LCDINTMSK = (LCDINTMSK & ~(0x3)) | 0;                               /*  屏蔽中断                    */
     LPCSEL    = (LPCSEL & ~(1)) | 0;                                    /*  禁能 LPC3600/LCC3600 模式   */
     TPAL      = 0x00;                                                   /*  不使用调色板                */
 }
 
+void lcd_set_frame_buffer( unsigned short *b )
+{
+
+    /* 视频帧缓冲区内存地址高位[30:22]  -> LCDSADDR1[29:21] */
+    LCDSADDR1 = (LCDSADDR1 & ~(0x1FF << 21)) | (((uint32_t)b >> 22) & 0x1FF) << 21;
+
+    /* 视频帧缓冲区内存地址低位[21:1]   -> LCDSADDR1[20:0] */
+    LCDSADDR1 = (LCDSADDR1 & ~(0x1FFFFF)) | (((uint32_t)b >> 1) & 0x1FFFFF);
+
+    /* 视频帧缓冲区的结束地址低位[21:1] -> LCDSADDR2[20:0] */
+    LCDSADDR2 = (LCDSADDR2 & ~(0x1FFFFF)) | ((((uint32_t)b + LINEVAL * HOZVAL * 2) >> 1) & 0x1FFFFF);
+}
 
 /*
  * 打开 FrameBuffer
@@ -166,7 +171,26 @@ void * fb_open( void )
     LCDCON1 = (LCDCON1 & ~(1)) | ENVID;                                 /*  开启视频输出                */
     return framebuffer;
 }
+static int g_current;
 
+void *fb_back_get( void )
+{
+	if ( g_current ) {
+		return framebuffer;
+	} else {
+		return framebuffer2;
+	}
+}
+
+void fb_flip( void )
+{
+	g_current = !g_current;
+	if ( g_current ) {
+		lcd_set_frame_buffer( framebuffer2 );
+	} else {
+		lcd_set_frame_buffer( framebuffer );
+	}
+}
 /*
  * 关闭 FrameBuffer
  */

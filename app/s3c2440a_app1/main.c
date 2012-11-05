@@ -67,6 +67,8 @@ static void swap( int *a, int *b)
 }
 //#define mutex_lock(f,r) 0
 //#define mutex_unlock(f)
+//#define mutex_init(f)
+//#define kprintf(...)
 void mtask( void )
 {
     int i;
@@ -99,6 +101,8 @@ void mtask( void )
             ret = mutex_lock( pm[i], /*rand()%100 + 100*/-1 );
             if ( ret ) {
                 kprintf("%s: (%d)@%d mutex_lock error: ret=%d\n",CURRENT_TASK_NAME(), ptcb_current->priority, ptcb_current->current_priority, ret );
+            } else {
+                kprintf("%s: (%d)@%d mutex_lock OK\n", CURRENT_TASK_NAME(), ptcb_current->priority, ptcb_current->current_priority);
             }
         }
         //p = malloc( size );
@@ -132,8 +136,8 @@ static void led_task( void *pa, void *pb)
     }
 }
 int rtk_sprintf( char *buff, const char* str, ... );
-    void * fb_open( void );
-
+void * fb_open( void );
+void *fb_back_get( void );void fb_flip( void );
 
 void main_task( void *pa, void *pb)
 {
@@ -175,13 +179,15 @@ void main_task( void *pa, void *pb)
     semb_terminate( &sem );
     task_priority_set( NULL, MAX_PRIORITY );
     while (9) {
+        color = rand();
+        frame_buffer = fb_back_get();
         for (x=0; x<240; x++) {
             for (y=0; y<320; y++) {
-                color = rand();
                 *(frame_buffer+x+y*240) = color;
             }
         }
-        task_delay(1);
+        fb_flip();
+        task_delay( 100 );
     }
 }
 

@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-11-04 12:38:10 Sunday by lyzh>
+/* Last modified Time-stamp: <2012-11-05 16:06:08 Monday by liangyaozhan>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -41,8 +41,16 @@
  */
 #define MAX_PRIORITY            255  /*!< must be <= 1023 and >=0 */
 
-#define DEAD_LOCK_DETECT_EN     1
-#define DEAD_LOCK_SHOW_EN       1
+#define CONFIG_SEMC_EN    1
+#define CONFIG_SEMB_EN    1
+#define CONFIG_MUTEX_EN   1
+#define CONFIG_MSGQ_EN    1
+#define CONFIG_TASK_PRIORITY_SET_EN    1
+#define CONFIG_TASK_TERMINATE_EN       1
+#define CONFIG_DEAD_LOCK_DETECT_EN     1
+#define CONFIG_DEAD_LOCK_SHOW_EN       0
+
+#define IDLE_TASK_STACK_SIZE    1024
 
 
 
@@ -51,7 +59,7 @@
 /** @} grp_rtkcfg */
 
 
-#endif	/* __ARMV6M_INT_USRCFG_H */
+#endif    /* __ARMV6M_INT_USRCFG_H */
 
 /* end of file */
 
