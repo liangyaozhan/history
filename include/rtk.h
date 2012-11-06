@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-11-05 16:05:54 Monday by liangyaozhan>
+/* Last modified Time-stamp: <2012-11-06 23:50:51 Tuesday by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -33,19 +33,6 @@
  *  @{
  */
 
-/**
- *  @addtogroup configuration
- *  @{
- */
-
-/**
- *  @name priority_number_configuration
- *  @{
- */
-/*#define MAX_PRIORITY            8  *//*!< must be <= 256 and >=1 */
-/**
- *  @}
- */
 
 /**
  *  @brief optimize macro
@@ -192,11 +179,11 @@ typedef struct __msgq_t msgq_t;
  */
 
 /**
- *  @defgroup kernel_const_value
+ *  @defgroup kernel_const_value const definition
  *  @{
  */
 /**
- *  @defgroup task_status
+ *  @defgroup task_status   task status definition
  *  @{
  */
 #define TASK_READY              0x00
@@ -216,7 +203,7 @@ typedef struct __msgq_t msgq_t;
  *  @{
  */
 /**
- *  @defgroup semaphore_type
+ *  @defgroup semaphore_type    semaphore type
  *  @{
  */
 #define SEM_TYPE_BINARY     0x01    /*!< semaphore type: binary  */
@@ -256,7 +243,7 @@ typedef struct __msgq_t msgq_t;
  */
 
 /**
- *  @defgroup TASK_API
+ *  @defgroup TASK_API task API
  *  @{
  */
 
@@ -347,7 +334,8 @@ void task_init(tcb_t      *ptcb,
  *  add a task to running queue.
  */
 int task_startup( tcb_t *ptcb );
-int task_priority_set( tcb_t *ptcb, unsigned int priority );
+
+
 /**
  *  @brief starting up operating system.
  *
@@ -390,6 +378,10 @@ int task_terminate( tcb_t *ptcb );
  *  delay tick.
  */
 void task_delay( int tick );
+
+/**
+ *  \brief system tick get
+ */
 unsigned int tick_get( void );
 
 int task_safe( void );
@@ -415,7 +407,7 @@ int task_unsafe( void );
  */
 
 /**
- *  @defgroup SEMAPHORE_API
+ *  @defgroup SEMAPHORE_API semaphore API
  *  @{
  */
 
@@ -476,12 +468,12 @@ int task_unsafe( void );
     }
     
 /**
- *  @brief semaphore counter initialize
+ *  \brief Initialize a counter semaphore.
  *
- *  @param  semid       semaphore counter piontor.
- *  @param  InitCount   initialize value.
- *  @return 0           OK.
- *  @return -1          FAILED.
+ *  \param[in]  semid       pointer
+ *  \param[in]  initcount   Initializer: 0 or 1.
+ *  \return     0           always successfully.
+ *  \attention  parameter is not checked. You should check it by yourself.
  */
 int  semc_init( semaphore_t *semid, int InitCount );
 
@@ -491,95 +483,135 @@ int  semc_init( semaphore_t *semid, int InitCount );
 int  semc_terminate( semaphore_t*semid );
 
 /**
- *  @brief semaphore binary initialize
+ *  \brief Initialize a binary semaphore.
  *
- *  @param  semid       semaphore binary piontor.
- *  @param  InitCount   initialize value.
- *  @return 0           OK.
- *  @return -1          FAILED.
+ *  \param[in]  semid       pointer
+ *  \param[in]  initcount   Initializer: 0 or 1.
+ *  \return     0           always successfully.
+ *  \attention  parameter is not checked. You should check it by yourself.
  */
 int  semb_init( semaphore_t *semid, int InitCount );
 
 /**
- *  @brief semaphore binary deinitialize
+ *  \brief make a semaphore binary invalidate.
+ *
+ *  \param[in] semid    pointer
+ *  \return 0           successfully.
+ *  \return -EPERM      Permission Denied.
+ *
+ *  make the semaphore invalidate. This function will wake up all
+ *  the pending tasks with parameter -ENXIO, and the pending task will
+ *  get an error -ENXIO returning from semb_take().
+ *
+ *  \sa semb_init()
  */
 int  semb_terminate( semaphore_t*semid );
 
 /**
- *  @brief semaphore counter take
- *
- *  @param  semid       semaphore counter piontor.
- *  @param  tick        max waitting tick. -1 indicates forever.
- *                      @sa sys_clkrate_get().
- *                      if tick == 0, no waiting is performed.
- *  @return 0           OK.
- *  @return -1          FAILED.
+ *  \brief aquire a semaphore counter.
+ *  \param[in] semid    semaphore pointer
+ *  \param[in] tick     max waiting time in systerm tick.
+ *                      if tick == 0, it will return immedately without block.
+ *                      if tick == -1, it will wait forever.
+ *  \return     0       successfully.
+ *  \return     -EPERM  permission denied.
+ *  \return     -EINVAL Invalid argument
+ *  \return     -ETIME  time out.
+ *  \return     -ENXIO  semaphore is terminated by other task or interrupt service routine.
+ *  \return     -EAGAIN Try again. Only when tick==0 and semaphore is not available.
  */
 int  semc_take( semaphore_t *semid, unsigned int tick );
 
 /**
- *  @brief semaphore counter initialize
- *
- *  @param  semid       semaphore counter piontor.
- *  @return 0           OK.
- *  @return -1          FAILED.
+ *  \brief release a counter semaphore.
+ *  \param[in] semid    pointer
+ *  \return     0       successfully.
+ *  \return     -EPERM  permission denied.
+ *  \return     -ENOSPC no space to perform give operation.
+ *  \return     -EINVAL Invalid argument
+ *  \note               can be used in interrupt service.
  */
 int  semc_give( semaphore_t *semid );
 
+
 /**
- *  @brief semaphore counter initialize
+ *  \brief aquire a semaphore binary.
+ *  \param[in] semid    semaphore pointer
+ *  \param[in] tick     max waiting time in systerm tick.
+ *                      if tick == 0, it will return immedately without block.
+ *                      if tick == -1, it will wait forever.
+ *  \return     0       successfully.
+ *  \return     -EPERM  permission denied.
+ *  \return     -EINVAL Invalid argument
+ *  \return     -ETIME  time out.
+ *  \return     -ENXIO  semaphore is terminated by other task or interrupt service routine.
+ *  \return     -EAGAIN Try again. Only when tick==0 and semaphore is not available.
  *
- *  @param  semid       semaphore binary piontor.
- *  @param  tick        max waitting tick. -1 indicates forever.
- *                      @sa sys_clkrate_get().
- *                      if tick == 0, no waiting is performed.
- *  @return 0           OK.
- *  @return -1          FAILED.
  */
 int  semb_take( semaphore_t *semid, unsigned int tick );
 
 /**
- *  @brief semaphore counter initialize
- *
- *  @param  semid       semaphore binary piontor.
- *  @return 0           OK.
- *  @return -1          FAILED.
+ *  \brief release a binary semaphore.
+ *  \param[in] semid    pointer
+ *  \return     0       successfully.
+ *  \return     -EPERM  permission denied.
+ *  \return     -EINVAL Invalid argument
+ *  \note               can be used in interrupt service.
  */
 int  semb_give( semaphore_t *semid );
 
 /**
- *  @brief mutex initialize
- *
- *  @param  semid       mutex pointor
- *  @return 0           OK.
- *  @return -1          FAILED.
+ *  \brief initialize a mutex.
+ *  
+ *  \param[in]  semid       pointer
+ *  \return     0           always successfully.
+ *  \attention  parameter is not checked. You should check it yourself.
+ *  \sa mutex_terminate()
  */
 int  mutex_init( mutex_t *semid );
 
 /**
- *  @brief mutex lock
+ *  \brief aquire a mutex lock.
+ *  \param[in] semid    mutex pointer
+ *  \param[in] tick     max waiting time in systerm tick.
+ *                      if tick == 0, it will return immedately without block.
+ *                      if tick == -1, it will wait forever.
+ *  \return     0       successfully.
+ *  \return     -EPERM  permission denied.
+ *  \return     -EINVAL Invalid argument
+ *  \return     -ETIME  time out.
+ *  \return     -EDEADLK Deadlock condition detected.
+ *  \return     -ENXIO  mutex is terminated by other task or interrupt service routine.
+ *  \return     -EAGAIN Try again. Only when tick==0 and mutex is not available.
  *
- *  @param  semid       mutex pointor
- *  @param  tick        max waitting tick. -1 indicates forever.
- *                      @sa sys_clkrate_get().
- *                      if tick == 0, no waiting is performed.
- *  @return 0           OK.
- *  @return -1          FAILED.
+ *  \attention          cannot be used in interrupt service.
  */
 int  mutex_lock( mutex_t *semid, unsigned int tick );
 
 /**
- *  @brief mutex unlock
- *
- *  @param  semid       semaphore counter piontor.
- *  @return 0           OK.
- *  @return -1          FAILED.
+ *  \brief release a mutex lock.
+ *  \param[in] semid    mutex pointer
+ *  \return     0       successfully.
+ *  \return     -EPERM  permission denied.
+ *                      The mutex's ownership is not current task. Or
+ *                      used in interrupt context.
+ *  \return     -EINVAL Invalid argument
+ *  \attention          cannot be used in interrupt service.
  */
 int  mutex_unlock( mutex_t *semid );
 
 /**
- *  @brief mutex deinitialize
- *  
+ *  \brief make a mutex invalidate.
+ *
+ *  \param[in] semid    mutex pointer
+ *  \return 0       successfully.
+ *  \return -EPERM  Permission Denied.
+ *
+ *  make the mutex invalidate. This function will wake up all
+ *  the pending tasks with parameter -ENXIO, and the pending task will
+ *  get an error -ENXIO returning from mutex_take().
+ *
+ *  \sa mutex_init()
  */
 int mutex_terminate( mutex_t *mutex );
 /**
@@ -588,7 +620,7 @@ int mutex_terminate( mutex_t *mutex );
 
 
 /**
- *  \defgroup MSGQ_API
+ *  \defgroup MSGQ_API message queue API
  *  @{
  */
 
@@ -666,7 +698,15 @@ int mutex_terminate( mutex_t *mutex );
 #define MSGQ_DO_INIT(name, unitsize)  msgq_init( &name, __msgqbuff##name, sizeof(__msgqbuff##name), unitsize)
 
 /**
- *  @brief usage of msgq_init()
+ *  \brief Initialize a message queue.
+ *
+ *  \param[in]  pmsgq       pointer
+ *  \param[in]  buff        buffer pointer.
+ *  \param[in]  buffer_size buffer size.
+ *  \param[in]  unit_size   element size.
+ *  \return     0           always successfully.
+ *  \return     -EINVAL     Invalid argument.
+ *  \attention  parameter is not checked. You should check it by yourself.
  *
  *  @par example  
  *  @code
@@ -684,41 +724,56 @@ int mutex_terminate( mutex_t *mutex );
  */
 int msgq_init( msgq_t *pmsgq, void *buff, int buffer_size, int unit_size );
 
+/**
+ *  \brief make a msgq invalidate.
+ *
+ *  \param[in] pmsgq    pointer
+ *  \return 0           successfully.
+ *  \return -EPERM      Permission Denied.
+ *  
+ *  make the msgq invalidate. This function will wake up all
+ *  the pending tasks with parameter -ENXIO, and the pending task will
+ *  get an error -ENXIO returning from msgq_receive()/msgq_send().
+ *  
+ *  \sa msgq_init()
+ */
 int msgq_terminate( msgq_t *pmsgq );
 
 
 /**
- *  @brief recieve msg from a msgQ
- *  @param pmsgq     a pointor to the msgQ.(the return value of function msgq_create)
+ *  @brief receive msg from a msgQ
+ *  @param pmsgq     a pointer to the msgQ.(the return value of function msgq_create)
  *  @param buff      the memory to store the msg. It can be NULL. if
  *                   it is NULL, it just remove one message from the head.
  *  @param buff_size the buffer size.
  *  @param tick      the max time to wait if there is no message.
  *                   if pass -1 to this, it will wait forever.
- *  @retval -1       error, please check errno. if errno == ETIME, it means Timer expired,
+ *  @return -1       error, please check errno. if errno == ETIME, it means Timer expired,
  *                   if errno == ENOMEM, it mean buffer_size if not enough.
- *  @retval 0        recieve successfully.
+ *  @return 0        receive successfully.
  */
 int msgq_receive( msgq_t *pmsgq, void *buff, int buff_size, int tick );
 
 /**
  *  @brief send message to a the message Q.
- *  @param pmsgq     a pointor to the msgQ.(the return value of function msgq_create)
+ *  @param pmsgq     a pointer to the msgQ.
  *  @param buff      the message to be sent.
  *  @prarm size      the size of the message to be sent in bytes.
  *  @param tick      if the msgQ is not full, this function will return immedately, else it
  *                   will block some tick. Set it to -1 if you want to wait forever.
- *  @retval 0        OK
- *  @retval -1       the msgQ is full or pmsgQ is not valid. check errno for details.
- *                   errno:
- *                     EINVAL - Invalid argument
- *                     ETIME  - Timer expired
- *  @retval -2       invalid
+ *  @return 0        successfully.
+ *  @return -EINVAL  Invalid argument.
+ *  @return -ENODATA size is 0.
+ *  @return -ETIME   time expired.
  */
 int msgq_send( msgq_t *pmsgq, const void *buff, int size, int tick );
 
 /**
- *  @brief msgq clear internal count to 0(empty).
+ *  @brief reset a message queue.
+ *
+ *  make the specified message queue write counter full,
+ *  and read counter empty.
+ *  This function will wake up the writer.
  */
 int msgq_clear( msgq_t *pmsgq );
 
@@ -727,7 +782,7 @@ int msgq_clear( msgq_t *pmsgq );
  */
 
 /**
- *  @defgroup OTHER_API
+ *  @defgroup OTHER_API other API
  *  @{
  */
 

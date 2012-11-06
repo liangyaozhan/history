@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-11-05 16:06:08 Monday by liangyaozhan>
+/* Last modified Time-stamp: <2012-11-06 23:48:14 Tuesday by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -24,23 +24,19 @@
 #define __RTK_CONFIG_H
 
 /**
- * \addtogroup grp_rtkcfg
+ * \addtogroup grp_rtkcfg configuration
  * @{
  */
 
 /**
- * \brief 最大优先级数目配置
- *
- * 由于CPU资源可能有限，为了避免不必要的RAM消耗，用户可以将此参数设置为实际
- * 需要的优先级数目。取值范围：1 <= MAX_PRIORITY  <= 1023， 可用的优先级是：
- *  0到 MAX_PRIORITY。例：如果配置为7，那么可用优先级范围是0-7.
- *    
- *
- *
- * \hideinitializer
+ * \brief priority number configuration
  */
 #define MAX_PRIORITY            255  /*!< must be <= 1023 and >=0 */
 
+/**
+ *  \name API configuration macro
+ *  @{
+ */
 #define CONFIG_SEMC_EN    1
 #define CONFIG_SEMB_EN    1
 #define CONFIG_MUTEX_EN   1
@@ -49,10 +45,16 @@
 #define CONFIG_TASK_TERMINATE_EN       1
 #define CONFIG_DEAD_LOCK_DETECT_EN     1
 #define CONFIG_DEAD_LOCK_SHOW_EN       1
+/** @} */
 
+/**
+ *  \brief idle task stack size
+ *
+ *  maybe it is defined in makefile.
+ */
+#ifndef IDLE_TASK_STACK_SIZE
 #define IDLE_TASK_STACK_SIZE    1024
-
-
+#endif
 
 /** @} */
 

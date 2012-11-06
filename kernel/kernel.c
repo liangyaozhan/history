@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-11-05 20:53:14 Monday by lyzh>
+/* Last modified Time-stamp: <2012-11-06 22:30:23 Tuesday by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -118,8 +118,10 @@ void priority_q_init( void )
 static inline
 void priority_q_bitmap_set ( priority_q_bitmap_head_t *pqriHead, int priority )
 {
-    pqriHead->bitmap_tasks[ priority>>5 ] |= 1 << ( 0x1f & priority);
-    pqriHead->bitmap_group                |= 1 << (priority>>5);
+    register int grp = priority>>5;
+    
+    pqriHead->bitmap_tasks[ grp ] |= 1 << ( 0x1f & priority);
+    pqriHead->bitmap_group                |= 1 << grp;
 }
 
 static inline
@@ -1395,9 +1397,9 @@ int msgq_terminate( msgq_t *pmsgq )
  *  @param buff_size the buffer size.
  *  @param tick      the max time to wait if there is no message.
  *                   if pass -1 to this, it will wait forever.
- *  @retval -1       error, please check errno. if errno == ETIME, it means Timer expired,
+ *  @return -1       error, please check errno. if errno == ETIME, it means Timer expired,
  *                   if errno == ENOMEM, it mean buffer_size if not enough.
- *  @retval 0        receive successfully.
+ *  @return 0        receive successfully.
  */
 int msgq_receive( msgq_t *pmsgq, void *buff, int buff_size, int tick )
 {
