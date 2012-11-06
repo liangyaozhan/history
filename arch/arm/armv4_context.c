@@ -63,17 +63,16 @@ static const unsigned char __ffs8_table[256] = {
 int rtk_ffs( register unsigned int x )
 {
     register int r=0;
-    register unsigned int h = x>>16;
     
-    if ( h ) {
-        x = h;
+    if ( !(x & 0xffff) ) {
+        x >>= 16;
         r += 16;
     }
-    h = x >> 8;
-    if ( h ) {
-        x = h;
+    if ( !(x & 0xff) ) {
+        x >>= 8;
         r += 8;
     }
+    x &= 0xff;
     r +=  __ffs8_table[x];
     return r;
 }
