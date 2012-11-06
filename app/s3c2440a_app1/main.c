@@ -187,7 +187,7 @@ void main_task( void *pa, void *pb)
             }
         }
         fb_flip();
-        task_delay( 100 );
+        //task_delay( 100 );
     }
 }
 
