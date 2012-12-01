@@ -8,6 +8,7 @@ COMMON_FLAGS +=  -Wall
 LDFLAGS += -Wl,--start-group -lgcc -Wl,--end-group
 # remove unused sections: -Xlinker --gc-sections
 LDFLAGS += -Xlinker --gc-sections
+LDFLAGS += -mthumb
 #print removed sections : -Xlinker --print-gc-sections
 #LDFLAGS += -Xlinker --print-gc-sections
 
