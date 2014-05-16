@@ -30,7 +30,7 @@ static void uart_task( char *pa, void *pb)
         rand();
         rand();
         task_delay(10);
-        __asm volatile ("swi 0");
+        /* __asm volatile ("swi 0"); */
     }
 }
 
@@ -48,7 +48,7 @@ static void led_task1( void *pa, void *pb)
              *  data abort here.
              *  0x4000000 is protected by mmu. So, data abort.
              */
-            *(volatile int*)0x4000000 = 0;
+            /* *(volatile int*)0x4000000 = 0; */
         }
     }
 }
@@ -132,7 +132,7 @@ static void led_task( void *pa, void *pb)
         /*
          *  data abort here.
          */
-        *(volatile int *)-1 = 0;
+        /* *(volatile int *)-1 = 0; */
     }
 }
 int rtk_sprintf( char *buff, const char* str, ... );

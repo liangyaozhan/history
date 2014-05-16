@@ -1,96 +1,86 @@
 
+#define NOINT			0xc0
 
-.equ DISABLE_IRQ,0x80
-.equ DISABLE_FIQ,0x40
-.equ SYS_MOD,0x1f
-.equ IRQ_MOD,0x12
-.equ FIQ_MOD,0x11
-.equ SVC_MOD,0x13
-.equ ABT_MOD,0x17
-.equ UND_MOD,0x1b
-.equ MOD_MASK,0x1f
+/*
+ * rt_base_t rt_hw_interrupt_disable();
+ */
+.globl arch_interrupt_disable
+arch_interrupt_disable:
+	mrs r0, cpsr
+	orr r1, r0, #NOINT
+	msr cpsr_c, r1
+	mov pc, lr
 
+/*
+ * void arch_interrupt_enable(rt_base_t level);
+ */
+.globl arch_interrupt_enable
+arch_interrupt_enable:
+	msr cpsr, r0
+	mov pc, lr
 
-.macro CHANGE_TO_SVC
-        msr     cpsr_c,#(DISABLE_FIQ|DISABLE_IRQ|SVC_MOD)
-.endm
-
-.macro CHANGE_TO_IRQ
-        msr     cpsr_c,#(DISABLE_FIQ|DISABLE_IRQ|IRQ_MOD)
-.endm
-
-.macro CHANGE_TO_SYS
-        msr     cpsr_c,#(DISABLE_FIQ|DISABLE_IRQ|SYS_MOD)
-.endm
-
-    
-/***
-	* arch_contex_switch( void **sp_from, void **sp_to );
-	* R0 ==> sp_from.
-	* R1 ==> sp_to.
-	*/
-    .globl arch_context_switch
-    .globl arch_context_switch_interrupt
-	.type arch_context_switch, %function    
-	.type arch_context_switch_interrupt, %function    
-arch_context_switch_interrupt:  
+/*
+ * void arch_context_switch(rt_uint32 from, rt_uint32 to);
+ * r0 --> from
+ * r1 --> to
+ */
+.globl arch_context_switch
 arch_context_switch:
-    /* save PC */
-	push { lr }
-    /* save R14, R12 - R0 */
-	push { R0-R12, lr }
+	stmfd	sp!, {lr}		@ push pc (lr should be pushed in place of PC)
+	stmfd	sp!, {r0-r12, lr}	@ push lr & register file
 
-    /* save SPSR */
-	mrs r2, cpsr
-	push {r2}
-    
-	orr r2, r2, #0x80
-	msr cpsr, r2          /* disable irq */
-    
-	/* save sp */
-	mov r2, sp       /* r2 = sp */
-	str r2, [r0]       /* R0 = &sp */
+	mrs	r4, cpsr
+	stmfd	sp!, {r4}		@ push cpsr
+	mrs	r4, spsr
+	stmfd	sp!, {r4}		@ push spsr
 
-    
-    /* R1 == &sp */
-	/* R2 == sp  */
-	ldr r2, [r1]
-	mov sp, r2
+	str	sp, [r0]		@ store sp in preempted tasks TCB
+	ldr	sp, [r1]		@ get new task stack pointer
 
-    /*
-	 *  R0 is &sp
-	 */
-    MOV R0, R1
-	bl set_ptcb_current
-    
-    /* restore SPSR */
-	pop {r0}
-	msr cpsr, r0
+	ldmfd	sp!, {r4}		@ pop new task spsr
+	msr	spsr_cxsf, r4
+	ldmfd	sp!, {r4}		@ pop new task cpsr
+	msr	spsr_cxsf, r4
 
-    /* restore R0-R12, R14, R15 */
-	LDMFD SP!, {R0-R12, lr, pc}
+	ldmfd	sp!, {r0-r12, lr, pc}^	@ pop new task r0-r12, lr & pc
 
-/***
-	* arch_contex_switch_to( void **sp_to );
-	* R0 ==> sp_to
-	*/
-    .globl arch_context_switch_to
-    .type arch_context_switch, %function    
+/*
+ * void arch_context_switch_to(rt_uint32 to);
+ * r0 --> to
+ */
+.globl arch_context_switch_to
 arch_context_switch_to:
-    /* R0 == &sp */
-	/* R1 == sp  */
-	ldr r1, [r0]
-	mov sp, r1
+	ldr	sp, [r0]		@ get new task stack pointer
 
-	bl set_ptcb_current
-    
-    /* restore SPSR */
-	pop {r0}
-	msr cpsr, r0
+	ldmfd	sp!, {r4}		@ pop new task spsr
+	msr	spsr_cxsf, r4
+	ldmfd	sp!, {r4}		@ pop new task cpsr
+	msr	cpsr_cxsf, r4
 
-    /* restore R0-R12, R14, R15 */
-	LDMFD SP!, {R0-R12, lr, pc}
+	ldmfd	sp!, {r0-r12, lr, pc}	@ pop new task r0-r12, lr & pc
 
+/*
+ * void arch_context_switch_interrupt(rt_uint32 from, rt_uint32 to);
+ */
+.globl rt_thread_switch_interrupt_flag
+.globl rt_interrupt_from_thread
+.globl rt_interrupt_to_thread
+.globl arch_context_switch_interrupt
+arch_context_switch_interrupt:
+	ldr r2, =rt_thread_switch_interrupt_flag
+	ldr r3, [r2]
+	cmp r3, #1
+	beq _reswitch
+	mov r3, #1				@ set rt_thread_switch_interrupt_flag to 1
+	str r3, [r2]
+	ldr r2, =rt_interrupt_from_thread	@ set rt_interrupt_from_thread
+	str r0, [r2]
+_reswitch:
+	ldr r2, =rt_interrupt_to_thread		@ set rt_interrupt_to_thread
+	str r1, [r2]
+	mov pc, lr
+
+		
 .globl rtk_fork
 .type rtk_fork, %function    
 rtk_fork:
@@ -115,25 +105,3 @@ rtk_fork:
 		/* mov R0, R0  Ïàµ±ÓÚ:return ppfor_croutine(sp); */
 		LDMFD SP!, {R1-R12, lr, pc}
     
-.global arch_interrupt_disable
-  .func   arch_interrupt_disable
-arch_interrupt_disable:
-1:	   
-   MRS 		R0 , CPSR
-   ORR 		R1 , R0, #0xC0
-   MSR 		CPSR_c,R1
-   MRS 		R2 , CPSR
-   AND 		R2 , R2, #0xC0
-   CMP 		R2 , #0xC0
-   BNE 		1b
-   BX  		LR
-   .endfunc
-
-    
-.global arch_interrupt_enable
-   .func   arch_interrupt_enable
-arch_interrupt_enable:
-   MSR 		CPSR_c,R0
-   BX  		LR
-  .endfunc		
-

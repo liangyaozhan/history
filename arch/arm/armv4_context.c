@@ -33,7 +33,9 @@ unsigned char *arch_stack_init(void *tentry, void *a, void *b,
     *p-- = 0x22222222;                  /* r2*/
     *p-- = b;                  /* r1: arg1 of function task_entry_exit */
     *p-- = a;                  /* r0: arg0 of function task_entry_exit */
-    *p = STATUS_REG_INIT_VALUE; /* cpsr */
+    *p-- = STATUS_REG_INIT_VALUE; /* cpsr */
+    *p = STATUS_REG_INIT_VALUE; /* spsr */
+    
     /*
      *  full stack pointer
      */

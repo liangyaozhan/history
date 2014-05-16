@@ -1,7 +1,11 @@
-/* Last modified Time-stamp: <2012-10-29 20:12:40 Monday by lyzh>
+/* Last modified Time-stamp: <2014-05-16 12:28:42, by lyzh>
  * @(#)armv4_exc.c
  */
 #include "rtk.h"
+
+/* flag in interrupt handling */
+unsigned int rt_interrupt_from_thread, rt_interrupt_to_thread;
+unsigned int rt_thread_switch_interrupt_flag;
 
 
 void undefined_instruction(int lr )

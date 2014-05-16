@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-11-06 22:30:23 Tuesday by lyzh>
+/* Last modified Time-stamp: <2014-05-15 07:59:27, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -83,6 +83,7 @@ static int            __insert_pend_list_and_trig( semaphore_t *semid, tcb_t *pt
 #endif
 static tcb_t         *highest_tcb_get( void );
 extern void           arch_context_switch(void **fromsp, void **tosp);
+extern void           arch_context_switch_interrupt(void **fromsp, void **tosp);
 void                  arch_context_switch_to(void **sp);
 static void           schedule_internel( void );
 extern unsigned char *arch_stack_init(void *tentry, void *parameter1, void *parameter2,
@@ -230,6 +231,7 @@ tcb_t *highest_tcb_get( void )
 void os_startup( void )
 {
     tcb_t *ptcb = PRIO_NODE_TO_PTCB( g_readyq.phighest_node );
+    ptcb_current = ptcb;
     arch_context_switch_to(&ptcb->sp);
 }
 
@@ -1185,11 +1187,13 @@ int task_startup( tcb_t *ptcb )
 #if CONFIG_TASK_TERMINATE_EN
 int task_safe( void )
 {
-    return ++ptcb_current->safe_count;
+    ++ptcb_current->safe_count;
+    return 0;
 }
 int task_unsafe( void )
 {
-    return --ptcb_current->safe_count;
+    --ptcb_current->safe_count;
+    return 0;
 }
 /**
  *  \brief stop a task.
@@ -1254,7 +1258,10 @@ void schedule_internel( void )
 
     p = highest_tcb_get();
     if ( p != ptcb_current) {
-        arch_context_switch( &ptcb_current->sp, &p->sp);        
+        tcb_t *p_old;
+        p_old = ptcb_current;
+        ptcb_current = p;
+        arch_context_switch( &p_old->sp, &p->sp);        
     }
 }
 
@@ -1265,12 +1272,20 @@ void schedule( void )
 
     old = arch_interrupt_disable();
     if ( IS_INT_CONTEXT() ) {
+        tcb_t *p_old;
+        p_old = ptcb_current;
+        p = highest_tcb_get();
+        ptcb_current = p;
+        arch_context_switch_interrupt( &p_old->sp, &p->sp);
         goto done;
     }
     
     p = highest_tcb_get();
     if ( p != ptcb_current ){
-        arch_context_switch( &ptcb_current->sp, &p->sp);        
+        tcb_t *p_old;
+        p_old = ptcb_current;
+        ptcb_current = p;
+        arch_context_switch( &p_old->sp, &p->sp);
     }
 done:
     arch_interrupt_enable(old);
@@ -1287,6 +1302,7 @@ void task_exit( void )
     list_del_init( &ptcb_current->task_list_node );
 
     ptcb = PRIO_NODE_TO_PTCB( g_readyq.phighest_node );
+    ptcb_current = ptcb;
     arch_context_switch_to(&ptcb->sp);
 }
 
@@ -1305,13 +1321,22 @@ void task_idle( void *arg )
     }
 }
 
-/*
- *  this function must keep very simple.
- */
-void set_ptcb_current( void **pp )
+void enter_int_context( void )
 {
-    ptcb_current = container_of(pp, tcb_t, sp);
+    int old;
+    old = arch_interrupt_disable();
+    ++is_int_context;
+    arch_interrupt_enable( old );
 }
+void exit_int_context( void )
+{
+    int old;
+    schedule();
+    old = arch_interrupt_disable();
+    --is_int_context;
+    arch_interrupt_enable( old );
+}
+
 
 void kernel_init( void )
 {
@@ -1322,6 +1347,7 @@ void kernel_init( void )
     priority_q_init();
     TASK_INIT( "idle", info1, MAX_PRIORITY, task_idle, 0,0 );
     TASK_STARTUP(info1);
+    ptcb_current = NULL;
 }
 
 unsigned int tick_get( void )

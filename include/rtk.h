@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-11-06 23:50:51 Tuesday by lyzh>
+/* Last modified Time-stamp: <2014-05-15 08:15:39, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -788,13 +788,15 @@ int msgq_clear( msgq_t *pmsgq );
 
 void arch_interrupt_enable( int old );
 int  arch_interrupt_disable( void );
+void enter_int_context( void );
+void exit_int_context( void );
 int  kprintf ( const char* str, ... );
 
 extern int is_int_context;
 extern void schedule(void);
 #define IS_INT_CONTEXT()        (is_int_context>0)
-#define ENTER_INT_CONTEXT()     (++is_int_context)
-#define EXIT_INT_CONTEXT()      (--is_int_context, schedule())
+#define ENTER_INT_CONTEXT()     enter_int_context()
+#define EXIT_INT_CONTEXT()      exit_int_context()
 
 
 /**

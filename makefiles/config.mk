@@ -30,8 +30,8 @@ VERSION ?= debug
 DEFAULT_LIB_NAME:=librtk.a
 
 # gnu工具链前缀
-#CROSS_COMPILE =arm-none-linux-gnueabi-
 CROSS_COMPILE =arm-none-eabi-
+#CROSS_COMPILE=arm-rtk-eabi-
 
 # 编译SylixOS所有源码共用的头文件路径
 # 注意： 只需写上路径就可以，而不需要在路径前加"-I"。

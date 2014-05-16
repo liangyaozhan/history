@@ -12,6 +12,7 @@
 .global _software_interrupt
 /****************************************************************************/
 
+#define NOINT			0xc0
     
 /****************************************************************************/    
 set_irq_stack:
@@ -67,94 +68,68 @@ set_abort_stack:
 	mov pc, lr
     
 /****************************************************************************/    
+.globl 		rt_interrupt_enter
+.globl 		rt_interrupt_leave
+.globl 		rt_thread_switch_interrupt_flag
+.globl 		rt_interrupt_from_thread
+.globl 		rt_interrupt_to_thread
 _irqhandle:
-    stmfd SP!, {R0-R3}
+	stmfd	sp!, {r0-r12,lr}
+/*	bl		rt_interrupt_enter */
+	bl		irq_handle
+/*	bl		rt_interrupt_leave */
 
-    /*
-    * R1 irq stack top, where we store the task context's R0-R3
-    * R2 return address
-    * irq stack not changed, so SP += 16.
-    */
-    MOV R1, SP        
-    ADD SP, SP, #16
-    MOV R2, r14
-    SUB R2, R2, #4
+	/* if rt_thread_switch_interrupt_flag set, jump to _interrupt_thread_switch and don't return */
+	ldr		r0, =rt_thread_switch_interrupt_flag
+	ldr		r1, [r0]
+	cmp		r1, #1
+	beq		_interrupt_thread_switch
 
-    /*
-     * restore CPSR from SPSR,
-     * and it is now in SVC32 mode.
-     */
-    MRS R0, SPSR
-    MOV R3, R0
-    orr R0, R0, #0x80 /* disable irq interrupt */
-    MSR CPSR_c, R0
+	ldmfd	sp!, {r0-r12,lr}
+	subs	pc, lr, #4
 
-    /*
-     * we use svc32's stack to handle irq service.
-     */
 
-    /*
-	 * this is returning address.
-	 */
-    PUSH {R2}
+_interrupt_thread_switch:
+	mov		r1,  #0					/* clear rt_thread_switch_interrupt_flag*/
+	str		r1,  [r0]
+
+	ldmfd	sp!, {r0-r12,lr}		/* reload saved registers			*/
+	stmfd	sp!, {r0-r3}			/* save r0-r3						*/
+	mov		r1,  sp
+	add		sp,  sp, #16			/* restore sp						*/
+	sub		r2,  lr, #4				/* save old task's pc to r2			*/
 	
-    /*
-	 * save svc's LR
-	 */
-    PUSH {LR}
+	mrs		r3,  spsr				/* disable interrupt				*/
+	orr		r0,  r3, #NOINT
+	msr		spsr_c, r0
 
-    /*
-	 * LR can be a temp register now.
-	 * SAVE R2 to LR, we will pass LR to handler.
-	 */
-	MOV LR, R2
-    
-    /*
-     * we reserve 16 bytes for the task's context R0-R3,
-     * 
-     */
-    STMFD SP!, {R0-R3}
-    /* SUB SP, SP, #16 */
-    
-    /*
-     * push R0-R3.
-     */
-    STMFD SP!, {R0-R4}
+	ldr		r0,  =.+8				/* switch to interrupted task's stack*/
+	movs	pc,  r0
 
-    /*
-     * load the task context's R0-R3
-     */
-    MOV R4, R1
-    LDMFD R4, {R0-R3}
-    /*
-     * save the task context's to the places where we preseved for it. 
-     * NOTE: they are not in a safe place while calling irq_handle,
-     * irq might happen again. 
-     */
-    ADD   SP, SP, #36
-    STMFD SP, {R0-R3}
-    SUB   SP, SP, #36
+	stmfd	sp!, {r2}				/* push old task's pc				*/
+	stmfd	sp!, {r4-r12,lr}		/* push old task's lr,r12-r4		*/
+	mov		r4,  r1					/* Special optimised code below		*/
+	mov		r5,  r3
+	ldmfd	r4!, {r0-r3}
+	stmfd	sp!, {r0-r3}			/* push old task's r3-r0			*/
+	stmfd	sp!, {r5}				/* push old task's psr				*/
+	mrs		r4,  spsr
+	stmfd	sp!, {r4}				/* push old task's spsr				*/
 
-    /*
-	 * interrupting address.
-	 */
-    MOV R0,LR
-    BL    irq_handle
+	ldr		r4,  =rt_interrupt_from_thread
+	ldr		r5,  [r4]
+	str		sp,  [r5]				/* store sp in preempted tasks's TCB*/
 
-    /*
-     * after irq_handle, irq must be disabled.
-     */
-    
-    LDMFD SP!,{R0-R4}
-    /*
-     * now,
-     * R2 is returning address.
-     * R3 is CPSR.
-     * R1 is irq stack top.
-     */
+	ldr	r6,  =rt_interrupt_to_thread
+	ldr	r6,  [r6]
+	ldr	sp,  [r6]					/* get new task's stack pointer		*/
 
-    MSR CPSR, R3
-    LDMFD SP!,{R0-R3, LR, PC}
+	ldmfd	sp!, {r4}				/* pop new task's spsr				*/
+	msr		SPSR_cxsf, r4
+	ldmfd	sp!, {r4}				/* pop new task's psr				*/
+	msr		CPSR_cxsf, r4
+
+	ldmfd	sp!, {r0-r12,lr,pc}		/* pop new task's r0-r12,lr & pc	*/
 
 
 /****************************************************************************/    

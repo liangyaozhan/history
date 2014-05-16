@@ -66,6 +66,7 @@ EX_CLEAN_FILE +=
 #
 stm32f10x-apps := stm32-example1  stm32-example2
 s3c2440a-apps := s3c2440a_app1
+imx283-apps := imx283_app1
 
 ifeq ($(findstring clean,$(MAKECMDGOALS)),clean)
 
