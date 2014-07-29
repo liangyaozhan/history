@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-05-15 08:15:39, by lyzh>
+/* Last modified Time-stamp: <2014-07-29 10:14:23, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -19,51 +19,23 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#ifndef __TCB_H
-#define __TCB_H
+#ifndef __RTK_H
+#define __RTK_H
 
 #include <stdint.h>
 #include "list.h"
 #include "rtk_config.h"
-
-#define size_t uint32_t
 
 /**
  *  @addtogroup kernel
  *  @{
  */
 
-
-/**
- *  @brief optimize macro
- */
-#define likely(x)    __builtin_expect(!!(x), 1)  /*!< likely optimize macro      */
-#define unlikely(x)    __builtin_expect(!!(x), 0)  /*!< unlikely optimize macro    */
-
-/**
- *  @brief ROUND DOWN and UP
- */
-#define ROUND_DOWN(p, d)        (((int)p) & (~(d-1)))
-#define ROUND_UP(x, align)  (((int) (x) + (align - 1)) & ~(align - 1))
-
-#if DEBUG>0
-#define ASSERT(condiction)                                              \
-    do{                                                                 \
-        if ( (condiction) )                                             \
-            break;                                                      \
-        kprintf("ASSERT " #condiction "failed: " __FILE__ ":%d: " ": " "\r\n", __LINE__); \
-        while (9);                                                      \
-    }while (0)
-#define KERNEL_ARG_CHECK_EN 1
-#else
-#define ASSERT(condiction)  do{}while(0)
-#define KERNEL_ARG_CHECK_EN 0
-#endif
-
 /**
  *  @addtogroup kernel_structure
  *  @{
  */
+
 
 /**
  *  @brief soft timer structure definition
@@ -72,44 +44,41 @@
  *  The list is sorted at insertion time by uiTick.
  *  The first element's uiTick is decreased at each tick anounce in the link list.
  */
-struct __softtimer
+struct  rtk_tick
 {
     struct list_head node;                          /*!< node to the link list   */
-    unsigned int     uiTick;                        /*!< tick count              */
-    void (*timeout_func)( struct __softtimer *);    /*!< timeout function        */
+    unsigned int     tick;                        /*!< tick count              */
+    void (*timeout_callback)( struct rtk_tick *);    /*!< timeout callback function        */
 };
-typedef struct __softtimer softtimer_t;
+
 
 /**
  *  @brief priority queue node structure
  *
  *  This is a priority queue node with key.
  */
-struct __priority_q_node
+struct rtk_private_priority_q_node
 {
     struct list_head node;          /*!< the node       */
     int              key;           /*!< the key value  */
 };
-typedef struct __priority_q_node pqn_t;
 
 /**
  *  @brief task control block definition
  *
  *  Task Control Block have many fields.
- *  Task's name is copied to top of the stack by task_init() functoin.
+ *  Task's name is just a pointor.
  *  option and safe_count is not used currently.
  *  @sa TASK_API
  */
-struct                 __tcb_t;
-typedef struct __tcb_t tcb_t;
-struct __tcb_t
+struct rtk_tcb
 {
-    void             *sp;                   /*!< stack pointor          */
+    void             *sp;                   /*!< stack pointor, will keep it the first one */
     const char       *name;                 /*!< task's name            */
     char             *stack_low;            /*!< stack low pointor      */
     char             *stack_high;           /*!< stack high pointor     */
-    pqn_t             prio_node;            /*!< node in priority Q     */
-    softtimer_t       tick_node;            /*!< node in softtimer Q    */
+    struct rtk_private_priority_q_node  prio_node;    /*!< node in priority Q     */
+    struct rtk_tick   tick_node;            /*!< node in softtimer Q    */
     struct list_head  sem_node;             /*!< node in pending Q      */
     struct list_head *psem_list;            /*!< pend node if any       */
 #if CONFIG_MUTEX_EN
@@ -132,38 +101,36 @@ struct __tcb_t
  *
  *  @sa SEMAPHORE_API
  */
-struct __semaphore_t
+struct rtk_semaphore
 {
     union {
         unsigned int        count; /*!< counter when it is semB or sem C    */
-        struct __tcb_t     *owner; /*!< owner when it is mutex              */
+        struct rtk_tcb     *owner; /*!< owner when it is mutex              */
     }u;
     struct list_head        pending_tasks;          /*!< the pending tasks link list head    */
     unsigned char           type;                   /*!< Specifies the type of semaphore     */
 };
-typedef struct __semaphore_t semaphore_t;
 
 /**
  *  @brief mutex struct
  */
-struct __mutex_t
+struct rtk_mutex
 {
-    semaphore_t             s;
+    struct rtk_semaphore    s;
     struct list_head        sem_member_node;        /*!< only used when it is mutex          */
     int                     mutex_recurse_count;    /*!< only used when it is mutex          */
 };
-typedef struct __mutex_t mutex_t;
 
 
 /**
- *  @brief msgq_t struct definition
+ *  @brief struct rtk_msgq struct definition
  *
  *  @sa  MSGQ_API  
  */
-struct __msgq_t
+struct rtk_msgq
 {
-    semaphore_t sem_rd;         /*!< read semaphore          */
-    semaphore_t sem_wr;         /*!< write semaphore         */
+    struct rtk_semaphore sem_rd;         /*!< read semaphore          */
+    struct rtk_semaphore sem_wr;         /*!< write semaphore         */
     int         buff_size;      /*!< buffer size             */
     int         count;          /*!< max unit                */
     int         unit_size;      /*!< element size            */
@@ -171,7 +138,6 @@ struct __msgq_t
     int         wr;             /*!< write pointor           */
     char       *buff;        /*!< dynamic allocated       */
 };
-typedef struct __msgq_t msgq_t;
 
 
 /**
@@ -203,7 +169,7 @@ typedef struct __msgq_t msgq_t;
  *  @{
  */
 /**
- *  @defgroup semaphore_type    semaphore type
+ *  @defgroup struct rtk_semaphoreype    semaphore type
  *  @{
  */
 #define SEM_TYPE_BINARY     0x01    /*!< semaphore type: binary  */
@@ -279,7 +245,8 @@ typedef struct __msgq_t msgq_t;
  *  }
  *  @endcode
  */
-#define TASK_INFO_DECL(zone, info, stack_size) zone struct __taskinfo_##info {tcb_t tcb; char stack[stack_size]; }info
+#define TASK_INFO_DECL(zone, info, stack_size) zone struct __taskinfo_##info {struct rtk_tcb tcb; char stack[stack_size]; }info
+
 /**
  *  @brief init task infomation
  *
@@ -287,6 +254,7 @@ typedef struct __msgq_t msgq_t;
  */
 #define TASK_INIT(name, info, priority, func, arg1, arg2)               \
     task_init( &info.tcb, (name), (priority), 0, info.stack, info.stack+sizeof(info.stack)-1, func, (arg1), (arg2) )
+
 /**
  *  @brief task startup macro.
  *
@@ -299,7 +267,7 @@ typedef struct __msgq_t msgq_t;
  *
  * kernel_init() must be called first of all.
  */
-void kernel_init( void );
+void rtk_init( void );
 
 /**
  * @brief task control block init.
@@ -318,7 +286,7 @@ void kernel_init( void );
  *  So you must use function task_startup() to start a initialized task.
  * @sa task_starup();
  */
-void task_init(tcb_t      *ptcb,
+void task_init(struct rtk_tcb      *ptcb,
                const char *name,
                int         priority, /* priority of new task */
                int         option, /* task option word */
@@ -333,7 +301,7 @@ void task_init(tcb_t      *ptcb,
  *
  *  add a task to running queue.
  */
-int task_startup( tcb_t *ptcb );
+int task_startup( struct rtk_tcb *ptcb );
 
 
 /**
@@ -343,7 +311,7 @@ int task_startup( tcb_t *ptcb );
  *  the highest priority task created. So, task must be created and started up
  *  before calling this function.
  */
-void os_startup( void );
+void rtk_startup( void );
 
 /**
  *  @brief set task priority 
@@ -362,7 +330,7 @@ void os_startup( void );
  *                                |
  *                         current priority
  */
-int task_priority_set( tcb_t *ptcb, unsigned int priority );
+int task_priority_set( struct rtk_tcb *ptcb, unsigned int priority );
 
 
 /**
@@ -370,7 +338,7 @@ int task_priority_set( tcb_t *ptcb, unsigned int priority );
  *
  *  the task may be running or pending.
  */
-int task_terminate( tcb_t *ptcb );
+int task_terminate( struct rtk_tcb *ptcb );
 
 /**
  *  @brief task delay
@@ -390,17 +358,17 @@ int task_unsafe( void );
 /**
  *  @brief current task name
  */
-#define CURRENT_TASK_NAME() (ptcb_current->name+0)
+#define CURRENT_TASK_NAME() (rtk_ptcb_current->name+0)
 
 /**
  *  @brief current task priority
  */
-#define CURRENT_TASK_PRIORITY() (ptcb_current->priority+0)
+#define CURRENT_TASK_PRIORITY() (rtk_ptcb_current->priority+0)
 
 /**
  *  @brief current task errno
  */
-#define CURRENT_TASK_ERR() (ptcb_current->err+0)
+#define CURRENT_TASK_ERR() (rtk_ptcb_current->err+0)
 
 /**
  *  @}
@@ -416,9 +384,9 @@ int task_unsafe( void );
  *
  *  @par example  
  *  @code
- *  semaphore_t semb;
- *  semaphore_t semc;
- *  mutex_t mutex;
+ *  struct rtk_semaphore semb;
+ *  struct rtk_semaphore semc;
+ *  struct rtk_mutex mutex;
  *  void do_init( void ) {
  *      semc_init( &semc, init_count );
  *      semb_init( &semb, init_count ); /@ 0 or 1 @/
@@ -438,7 +406,7 @@ int task_unsafe( void );
  *  @endcode
  */
 #define SEM_DECL( sem, t, init)                 \
-    semaphore_t sem; semaphore_t sem = {                         \
+    struct rtk_semaphore sem; struct rtk_semaphore sem = {                         \
         {init},                                 \
         LIST_HEAD_INIT(sem.pending_tasks),      \
         t,                                      \
@@ -458,7 +426,7 @@ int task_unsafe( void );
  *  @brief mutex declaration macro.
  */
 #define MUTEX_DECL(zone, var)                                  \
-    zone mutex_t var={                                        \
+    zone struct rtk_mutex var={                                        \
         {                                                \
             {0}, LIST_HEAD_INIT((var).s.pending_tasks),  \
             SEM_TYPE_MUTEX,                              \
@@ -475,12 +443,12 @@ int task_unsafe( void );
  *  \return     0           always successfully.
  *  \attention  parameter is not checked. You should check it by yourself.
  */
-int  semc_init( semaphore_t *semid, int InitCount );
+int  semc_init( struct rtk_semaphore *semid, int InitCount );
 
 /**
  *  @brief semaphore counter deinitialize
  */
-int  semc_terminate( semaphore_t*semid );
+int  semc_terminate( struct rtk_semaphore*semid );
 
 /**
  *  \brief Initialize a binary semaphore.
@@ -490,7 +458,7 @@ int  semc_terminate( semaphore_t*semid );
  *  \return     0           always successfully.
  *  \attention  parameter is not checked. You should check it by yourself.
  */
-int  semb_init( semaphore_t *semid, int InitCount );
+int  semb_init( struct rtk_semaphore *semid, int InitCount );
 
 /**
  *  \brief make a semaphore binary invalidate.
@@ -505,7 +473,7 @@ int  semb_init( semaphore_t *semid, int InitCount );
  *
  *  \sa semb_init()
  */
-int  semb_terminate( semaphore_t*semid );
+int  semb_terminate( struct rtk_semaphore*semid );
 
 /**
  *  \brief aquire a semaphore counter.
@@ -520,7 +488,7 @@ int  semb_terminate( semaphore_t*semid );
  *  \return     -ENXIO  semaphore is terminated by other task or interrupt service routine.
  *  \return     -EAGAIN Try again. Only when tick==0 and semaphore is not available.
  */
-int  semc_take( semaphore_t *semid, unsigned int tick );
+int  semc_take( struct rtk_semaphore *semid, unsigned int tick );
 
 /**
  *  \brief release a counter semaphore.
@@ -531,7 +499,7 @@ int  semc_take( semaphore_t *semid, unsigned int tick );
  *  \return     -EINVAL Invalid argument
  *  \note               can be used in interrupt service.
  */
-int  semc_give( semaphore_t *semid );
+int  semc_give( struct rtk_semaphore *semid );
 
 
 /**
@@ -548,7 +516,7 @@ int  semc_give( semaphore_t *semid );
  *  \return     -EAGAIN Try again. Only when tick==0 and semaphore is not available.
  *
  */
-int  semb_take( semaphore_t *semid, unsigned int tick );
+int  semb_take( struct rtk_semaphore *semid, unsigned int tick );
 
 /**
  *  \brief release a binary semaphore.
@@ -558,7 +526,7 @@ int  semb_take( semaphore_t *semid, unsigned int tick );
  *  \return     -EINVAL Invalid argument
  *  \note               can be used in interrupt service.
  */
-int  semb_give( semaphore_t *semid );
+int  semb_give( struct rtk_semaphore *semid );
 
 /**
  *  \brief initialize a mutex.
@@ -566,9 +534,9 @@ int  semb_give( semaphore_t *semid );
  *  \param[in]  semid       pointer
  *  \return     0           always successfully.
  *  \attention  parameter is not checked. You should check it yourself.
- *  \sa mutex_terminate()
+ *  \sa struct rtk_mutexerminate()
  */
-int  mutex_init( mutex_t *semid );
+int  mutex_init( struct rtk_mutex *semid );
 
 /**
  *  \brief aquire a mutex lock.
@@ -586,7 +554,7 @@ int  mutex_init( mutex_t *semid );
  *
  *  \attention          cannot be used in interrupt service.
  */
-int  mutex_lock( mutex_t *semid, unsigned int tick );
+int  mutex_lock( struct rtk_mutex *semid, unsigned int tick );
 
 /**
  *  \brief release a mutex lock.
@@ -598,7 +566,7 @@ int  mutex_lock( mutex_t *semid, unsigned int tick );
  *  \return     -EINVAL Invalid argument
  *  \attention          cannot be used in interrupt service.
  */
-int  mutex_unlock( mutex_t *semid );
+int  mutex_unlock( struct rtk_mutex *semid );
 
 /**
  *  \brief make a mutex invalidate.
@@ -613,7 +581,7 @@ int  mutex_unlock( mutex_t *semid );
  *
  *  \sa mutex_init()
  */
-int mutex_terminate( mutex_t *mutex );
+int mutex_terminate( struct rtk_mutex *mutex );
 /**
  *  @}
  */
@@ -642,18 +610,18 @@ int mutex_terminate( mutex_t *mutex );
  *  }
  *  int func_send( int *buff )
  *  {
- *      return msgq_send( (msgq_t*)&mymsgq, buff, sizeof(int), 1000 );
+ *      return msgq_send( (struct rtk_msgq*)&mymsgq, buff, sizeof(int), 1000 );
  *  }
  *  int func_recieve( int *buff )
  *  {
- *      return msgq_recieve( (msgq_t*)mymsgq, buff, sizeof(int), -1, 0);
+ *      return msgq_recieve( (struct rtk_msgq*)mymsgq, buff, sizeof(int), -1, 0);
  *  }
  *  @endcode
  */
 
 #define MSGQ_DECL_INIT(zone, name, unitsize, cnt)                             \
     zone char __msgqbuff##name[(unitsize)*(cnt)];                  \
-    zone msgq_t name; msgq_t name = {                                           \
+    zone struct rtk_msgq name; struct rtk_msgq name = {                                           \
         /* .sem_rd = , */                                               \
         {{0,}, LIST_HEAD_INIT((name.sem_rd.pending_tasks)),  SEM_TYPE_COUNTER},    \
         /* .sem_wr = , */                                               \
@@ -688,13 +656,13 @@ int mutex_terminate( mutex_t *mutex );
  *  }
  *  int func_recieve( int *buff )
  *  {
- *      return msgq_recieve( (msgq_t*)mymsgq, buff, sizeof(int), -1, 0);
+ *      return msgq_recieve( (struct rtk_msgq*)mymsgq, buff, sizeof(int), -1, 0);
  *  }
  *  @endcode
  */
 #define MSGQ_DECL_NO_INIT(namespace, name, buffersize )                 \
     namespace char __msgqbuff##name[buffersize];                        \
-    namespace msgq_t name
+    namespace struct rtk_msgq name
 #define MSGQ_DO_INIT(name, unitsize)  msgq_init( &name, __msgqbuff##name, sizeof(__msgqbuff##name), unitsize)
 
 /**
@@ -716,13 +684,13 @@ int mutex_terminate( mutex_t *mutex );
  *          int a;int b;
  *      };
  *      char buffer[M];
- *      msgq_t msgq_var;
+ *      struct rtk_msgq msgq_var;
  *      void func_init( void ){
  *          msgq_init( &msgq_var, buffer, sizeof(buffer), (struct _yourbase_type));
  *      }
  *  @endcode
  */
-int msgq_init( msgq_t *pmsgq, void *buff, int buffer_size, int unit_size );
+int msgq_init( struct rtk_msgq *pmsgq, void *buff, int buffer_size, int unit_size );
 
 /**
  *  \brief make a msgq invalidate.
@@ -737,7 +705,7 @@ int msgq_init( msgq_t *pmsgq, void *buff, int buffer_size, int unit_size );
  *  
  *  \sa msgq_init()
  */
-int msgq_terminate( msgq_t *pmsgq );
+int msgq_terminate( struct rtk_msgq *pmsgq );
 
 
 /**
@@ -752,7 +720,7 @@ int msgq_terminate( msgq_t *pmsgq );
  *                   if errno == ENOMEM, it mean buffer_size if not enough.
  *  @return 0        receive successfully.
  */
-int msgq_receive( msgq_t *pmsgq, void *buff, int buff_size, int tick );
+int msgq_receive( struct rtk_msgq *pmsgq, void *buff, int buff_size, int tick );
 
 /**
  *  @brief send message to a the message Q.
@@ -766,7 +734,7 @@ int msgq_receive( msgq_t *pmsgq, void *buff, int buff_size, int tick );
  *  @return -ENODATA size is 0.
  *  @return -ETIME   time expired.
  */
-int msgq_send( msgq_t *pmsgq, const void *buff, int size, int tick );
+int msgq_send( struct rtk_msgq *pmsgq, const void *buff, int size, int tick );
 
 /**
  *  @brief reset a message queue.
@@ -775,7 +743,7 @@ int msgq_send( msgq_t *pmsgq, const void *buff, int size, int tick );
  *  and read counter empty.
  *  This function will wake up the writer.
  */
-int msgq_clear( msgq_t *pmsgq );
+int msgq_clear( struct rtk_msgq *pmsgq );
 
 /**
  *  @}
@@ -810,17 +778,7 @@ extern struct list_head g_systerm_tasks_head;
  *
  * @ATTENTION  you should NEVER modify it. 
  */
-extern tcb_t *ptcb_current;
-
-/**
- *  @brief Find First bit Set
- */
-int rtk_ffs( register unsigned int q );
-
-/**
- *  @brief standard memcpy
- */
-void *memcpy(void *dst0, const void *src0, int len0);
+extern struct rtk_tcb *rtk_ptcb_current;
 
 
 /**

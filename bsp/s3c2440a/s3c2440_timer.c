@@ -46,11 +46,11 @@
 #define NULL    ((void*)0)
 #endif
 
-void softtimer_announce( void );
+void rtk_tick_down_counter_announce( void );
 
 static int timer4_isr(uint32_t interrupt, void *arg)
 {
-    softtimer_announce();
+    rtk_tick_down_counter_announce();
     return 0;
 }
 

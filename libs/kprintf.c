@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-10-26 05:59:28 Friday by lyzh>
+/* Last modified Time-stamp: <2014-07-29 09:29:54, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -21,7 +21,6 @@
 
 #include "rtk.h"
 #include <stdarg.h>
-
 
 int serial_putc( char c );
 int serial_puts(const char *str);

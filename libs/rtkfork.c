@@ -1,23 +1,23 @@
-/* Last modified Time-stamp: <2012-10-27 09:50:51 Saturday by lyzh>
+/* Last modified Time-stamp: <2014-07-29 10:15:31, by lyzh>
  * @(#)rtkfork.c
  */
 
 #include "rtk.h"
 
 
-tcb_t *rtkfork_croutine( int *sp, int priority )
+struct rtk_tcb *rtkfork_croutine( int *sp, int priority )
 {
 #if 0
     int size;
     void *spBase;
-    tcb_t *ptcb;
+    struct rtk_tcb *ptcb;
     int old;
     size    = ptcb_current->StackSize;
     spBase  = (void*)malloc( size );
     if ( NULL == spBase) {
         return NULL;
     }
-    ptcb = (tcb_t*)malloc( sizeof(tcb_t) );
+    ptcb = (struct rtk_tcb*)malloc( sizeof(struct rtk_tcb) );
     if ( NULL == ptcb ) {
         free( spBase );
         return NULL;

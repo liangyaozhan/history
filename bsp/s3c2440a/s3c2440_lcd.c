@@ -22,13 +22,13 @@
 ** File name:               s3c2440_lcd.c
 ** Last modified Date:      2012-3-15
 ** Last Version:            1.0.0
-** Descriptions:            S3C2440 LCD Çý¶¯
+** Descriptions:            S3C2440 LCD ï¿½ï¿½
 **
 **--------------------------------------------------------------------------------------------------------
 ** Created by:              JiaoJinXing
 ** Created date:            2012-3-15
 ** Version:                 1.0.0
-** Descriptions:            ´´½¨ÎÄ¼þ
+** Descriptions:            ï¿½ï¿½ï¿½ï¿½ï¿½Ä¼ï¿½
 **
 **--------------------------------------------------------------------------------------------------------
 ** Modified by:
@@ -40,11 +40,11 @@
 #include <stdint.h>
 #include "s3c2440.h"
 /*
- * À©Õ¹ÔÄ¶Á:
+ * ï¿½ï¿½Õ¹ï¿½Ä¶ï¿½:
  * http://hi.baidu.com/760159/blog/item/b4c408894605c49ea4c272a3.html
  */
 /*********************************************************************************************************
-  LCD ÐÍºÅÅäÖÃ
+  LCD ï¿½Íºï¿½ï¿½ï¿½ï¿½ï¿½
 *********************************************************************************************************/
 #define LCD_N35     (1)
 #define LCD_PANEL   LCD_N35
@@ -53,39 +53,39 @@
 *********************************************************************************************************/
 #if LCD_PANEL == LCD_N35
 
-#define CLKVAL      (4)                                                 /*  LCD ÆµÂÊ                    */
-#define PNRMODE     (3)                                                 /*  ÏÔÊ¾Ä£Ê½: TFT LCD panel     */
+#define CLKVAL      (4)                                                 /*  LCD Æµï¿½ï¿½                    */
+#define PNRMODE     (3)                                                 /*  ï¿½ï¿½Ê¾Ä£Ê½: TFT LCD panel     */
 #define BPPMODE     (12)                                                /*  BPP Ä£Ê½: 16 bpp for TFT    */
-#define ENVID       (1)                                                 /*  ¿ªÆôÊÓÆµÊä³ö                */
+#define ENVID       (1)                                                 /*  ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æµï¿½ï¿½ï¿½                */
 
-#define VBPD        (1)                                                 /*  ´¹Ö±Í¬²½ÐÅºÅºó¼ç            */
-#define LINEVAL     (320)                                               /*  ´¹Ö±³ß´ç                    */
-#define VFPD        (5)                                                 /*  ´¹Ö±Í¬²½ÐÅºÅÇ°¼ç            */
-#define VSPW        (1)                                                 /*  ´¹Ö±Í¬²½ÐÅºÅÂö¿í            */
+#define VBPD        (1)                                                 /*  ï¿½ï¿½Ö±Í¬ï¿½ï¿½ï¿½ÅºÅºï¿½ï¿½            */
+#define LINEVAL     (600)                                               /*  ï¿½ï¿½Ö±ï¿½ß´ï¿½                    */
+#define VFPD        (5)                                                 /*  ï¿½ï¿½Ö±Í¬ï¿½ï¿½ï¿½Åºï¿½Ç°ï¿½ï¿½            */
+#define VSPW        (1)                                                 /*  ï¿½ï¿½Ö±Í¬ï¿½ï¿½ï¿½Åºï¿½ï¿½ï¿½ï¿½ï¿½            */
 
-#define HBPD        (39)                                                /*  Ë®Æ½Í¬²½ÐÅºÅºó¼ç            */
-#define HOZVAL      (240)                                               /*  Ë®Æ½³ß´ç                    */
-#define HFPD        (14)                                                /*  Ë®Æ½Í¬²½ÐÅºÅÇ°¼ç            */
-#define HSPW        (5)                                                 /*  Ë®Æ½Í¬²½ÐÅºÅÂö¿í            */
+#define HBPD        (39)                                                /*  Ë®Æ½Í¬ï¿½ï¿½ï¿½ÅºÅºï¿½ï¿½            */
+#define HOZVAL      (480)                                               /*  Ë®Æ½ï¿½ß´ï¿½                    */
+#define HFPD        (14)                                                /*  Ë®Æ½Í¬ï¿½ï¿½ï¿½Åºï¿½Ç°ï¿½ï¿½            */
+#define HSPW        (5)                                                 /*  Ë®Æ½Í¬ï¿½ï¿½ï¿½Åºï¿½ï¿½ï¿½ï¿½ï¿½            */
 
-#define OFFSIZE     (0)                                                 /*  ÐéÄâÆÁÄ»Æ«ÒÆ´óÐ¡(µ¥Î»°ë×Ö)  */
-#define PAGEWIDTH   (HOZVAL)                                            /*  ÐéÄâÆÁÄ»¿í¶È(µ¥Î»°ë×Ö)      */
+#define OFFSIZE     (0)                                                 /*  ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä»Æ«ï¿½Æ´ï¿½Ð¡(ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½)  */
+#define PAGEWIDTH   (HOZVAL)                                            /*  ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä»ï¿½ï¿½ï¿½(ï¿½ï¿½Î»ï¿½ï¿½ï¿½ï¿½)      */
 
-#define FRM565      (1)                                                 /*  16 BPP ÊÓÆµÊý¾Ý¸ñÊ½: RGB565 */
-#define PWREN       (1)                                                 /*  Ê¹ÄÜ LCD_PWREN Êä³öÐÅºÅ     */
-#define ENLEND      (0)                                                 /*  ½ûÄÜ LEND Êä³öÐÅºÅ          */
+#define FRM565      (1)                                                 /*  16 BPP ï¿½ï¿½Æµï¿½ï¿½Ý¸ï¿½Ê½: RGB565 */
+#define PWREN       (1)                                                 /*  Ê¹ï¿½ï¿½ LCD_PWREN ï¿½ï¿½ï¿½ï¿½Åºï¿½     */
+#define ENLEND      (0)                                                 /*  ï¿½ï¿½ï¿½ï¿½ LEND ï¿½ï¿½ï¿½ï¿½Åºï¿½          */
 
-#define BSWP        (0)                                                 /*  ×Ö½Ú²»½»»»                  */
-#define HWSWP       (1)                                                 /*  °ë×Ö½»»»                    */
-#define BPP24BL     (0)                                                 /*  24 BPP ÊÓÆµÊý¾Ý×Ö½ÚÐò: LSB  */
+#define BSWP        (0)                                                 /*  ï¿½Ö½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½                  */
+#define HWSWP       (1)                                                 /*  ï¿½ï¿½ï¿½Ö½ï¿½ï¿½ï¿½                    */
+#define BPP24BL     (0)                                                 /*  24 BPP ï¿½ï¿½Æµï¿½ï¿½ï¿½ï¿½Ö½ï¿½ï¿½ï¿½: LSB  */
 
-#define INVVCLK     (0)                                                 /*  ²»·´×ª VCLK                 */
-#define INVVLINE    (1)                                                 /*  ·´×ª VLINE                  */
-#define INVVFRAME   (1)                                                 /*  ·´×ª VFRAME                 */
-#define INVVD       (0)                                                 /*  ²»·´×ª VD                   */
-#define INVVDEN     (0)                                                 /*  ²»·´×ª VDEN                 */
-#define INVPWREN    (0)                                                 /*  ²»·´×ª PWREN                */
-#define INVLEND     (0)                                                 /*  ²»·´×ª LEND                 */
+#define INVVCLK     (0)                                                 /*  ï¿½ï¿½ï¿½ï¿½×ª VCLK                 */
+#define INVVLINE    (1)                                                 /*  ï¿½ï¿½×ª VLINE                  */
+#define INVVFRAME   (1)                                                 /*  ï¿½ï¿½×ª VFRAME                 */
+#define INVVD       (0)                                                 /*  ï¿½ï¿½ï¿½ï¿½×ª VD                   */
+#define INVVDEN     (0)                                                 /*  ï¿½ï¿½ï¿½ï¿½×ª VDEN                 */
+#define INVPWREN    (0)                                                 /*  ï¿½ï¿½ï¿½ï¿½×ª PWREN                */
+#define INVLEND     (0)                                                 /*  ï¿½ï¿½ï¿½ï¿½×ª LEND                 */
 
 #define LCD_WIDTH   (HOZVAL)
 #define LCD_HEIGHT  (LINEVAL)
@@ -94,81 +94,81 @@
 #endif
 
 /*
- * ÊÓÆµÖ¡»º³å
+ * ï¿½ï¿½ÆµÖ¡ï¿½ï¿½ï¿½ï¿½
  */
 static uint16_t framebuffer[LINEVAL][HOZVAL];
 static uint16_t framebuffer2[LINEVAL][HOZVAL];
 
 void lcd_set_frame_buffer( unsigned short *b );
 /*
- * ³õÊ¼»¯ LCD
+ * ï¿½ï¿½Ê¼ï¿½ï¿½ LCD
  */
 static void __lcd_init(void)
 {
-    GPGUP   = GPGUP  | (1 << 4);                                        /*  GPG4 ¹Ø±ÕÉÏÀ­µç×è           */
+    GPGUP   = GPGUP  | (1 << 4);                                        /*  GPG4 ï¿½Ø±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½           */
     GPGCON  = (GPGCON & ~(0x3 << 8)) | 3 << 8;                          /*  GPG4 -> LCD_PWREN           */
-    GPGDAT  = GPGDAT | (1 << 4);                                        /*  ´ò¿ª LCD µçÔ´               */
+    GPGDAT  = GPGDAT | (1 << 4);                                        /*  ï¿½ï¿½ LCD ï¿½ï¿½Ô´               */
 
-    GPCCON  = 0xAAAAAAAA;                                               /*  LCD ¹¦ÄÜ                    */
-    GPDCON  = 0xAAAAAAAA;                                               /*  LCD ¹¦ÄÜ                    */
+    GPCCON  = 0xAAAAAAAA;                                               /*  LCD ï¿½ï¿½ï¿½ï¿½                    */
+    GPDCON  = 0xAAAAAAAA;                                               /*  LCD ï¿½ï¿½ï¿½ï¿½                    */
 
-    LCDCON1 = (LCDCON1 & ~(0x3FF << 8)) | CLKVAL  << 8;                 /*  LCD ÆµÂÊ                    */
-    LCDCON1 = (LCDCON1 & ~(0x3   << 5)) | PNRMODE << 5;                 /*  ÏÔÊ¾Ä£Ê½                    */
-    LCDCON1 = (LCDCON1 & ~(0xF   << 1)) | BPPMODE << 1;                 /*  BPP Ä£Ê½(Ã¿ÏñËØµã×Ö½ÚÊý)    */
-    LCDCON1 = (LCDCON1 & ~(1)) | 0;                                     /*  ¹Ø±ÕÊÓÆµÊä³ö                */
+    LCDCON1 = (LCDCON1 & ~(0x3FF << 8)) | CLKVAL  << 8;                 /*  LCD Æµï¿½ï¿½                    */
+    LCDCON1 = (LCDCON1 & ~(0x3   << 5)) | PNRMODE << 5;                 /*  ï¿½ï¿½Ê¾Ä£Ê½                    */
+    LCDCON1 = (LCDCON1 & ~(0xF   << 1)) | BPPMODE << 1;                 /*  BPP Ä£Ê½(Ã¿ï¿½ï¿½ï¿½Øµï¿½ï¿½Ö½ï¿½ï¿½ï¿½)    */
+    LCDCON1 = (LCDCON1 & ~(1)) | 0;                                     /*  ï¿½Ø±ï¿½ï¿½ï¿½Æµï¿½ï¿½ï¿½                */
 
-    LCDCON2 = (LCDCON2 & ~(0xFF  << 24)) | VBPD << 24;                  /*  ´¹Ö±Í¬²½ÐÅºÅºó¼ç            */
-    LCDCON2 = (LCDCON2 & ~(0x3FF << 14)) | (LINEVAL - 1) << 14;         /*  ´¹Ö±³ß´ç                    */
-    LCDCON2 = (LCDCON2 & ~(0xFF  <<  6)) | VFPD << 6;                   /*  ´¹Ö±Í¬²½ÐÅºÅÇ°¼ç            */
-    LCDCON2 = (LCDCON2 & ~(0x3F)) | VSPW;                               /*  ´¹Ö±Í¬²½ÐÅºÅÂö¿í            */
+    LCDCON2 = (LCDCON2 & ~(0xFF  << 24)) | VBPD << 24;                  /*  ï¿½ï¿½Ö±Í¬ï¿½ï¿½ï¿½ÅºÅºï¿½ï¿½            */
+    LCDCON2 = (LCDCON2 & ~(0x3FF << 14)) | (LINEVAL - 1) << 14;         /*  ï¿½ï¿½Ö±ï¿½ß´ï¿½                    */
+    LCDCON2 = (LCDCON2 & ~(0xFF  <<  6)) | VFPD << 6;                   /*  ï¿½ï¿½Ö±Í¬ï¿½ï¿½ï¿½Åºï¿½Ç°ï¿½ï¿½            */
+    LCDCON2 = (LCDCON2 & ~(0x3F)) | VSPW;                               /*  ï¿½ï¿½Ö±Í¬ï¿½ï¿½ï¿½Åºï¿½ï¿½ï¿½ï¿½ï¿½            */
 
-    LCDCON3 = (LCDCON3 & ~(0x7F  << 19)) | HBPD << 19;                  /*  Ë®Æ½Í¬²½ÐÅºÅºó¼ç            */
-    LCDCON3 = (LCDCON3 & ~(0x7FF <<  8)) | (HOZVAL - 1) << 8;           /*  Ë®Æ½³ß´ç                    */
-    LCDCON3 = (LCDCON3 & ~(0xFF)) | HFPD;                               /*  Ë®Æ½Í¬²½ÐÅºÅÇ°¼ç            */
+    LCDCON3 = (LCDCON3 & ~(0x7F  << 19)) | HBPD << 19;                  /*  Ë®Æ½Í¬ï¿½ï¿½ï¿½ÅºÅºï¿½ï¿½            */
+    LCDCON3 = (LCDCON3 & ~(0x7FF <<  8)) | (HOZVAL - 1) << 8;           /*  Ë®Æ½ï¿½ß´ï¿½                    */
+    LCDCON3 = (LCDCON3 & ~(0xFF)) | HFPD;                               /*  Ë®Æ½Í¬ï¿½ï¿½ï¿½Åºï¿½Ç°ï¿½ï¿½            */
 
-    LCDCON4 = (LCDCON4 & ~(0xFF)) | HSPW;                               /*  Ë®Æ½Í¬²½ÐÅºÅÂö¿í            */
+    LCDCON4 = (LCDCON4 & ~(0xFF)) | HSPW;                               /*  Ë®Æ½Í¬ï¿½ï¿½ï¿½Åºï¿½ï¿½ï¿½ï¿½ï¿½            */
 
-    LCDCON5 = (LCDCON5 & ~(1 << 12)) | BPP24BL   << 12;                 /*  24 BPP ÊÓÆµÊý¾Ý×Ö½ÚÐò       */
-    LCDCON5 = (LCDCON5 & ~(1 << 11)) | FRM565    << 11;                 /*  16 BPP ÊÓÆµÊý¾Ý¸ñÊ½         */
-    LCDCON5 = (LCDCON5 & ~(1 << 10)) | INVVCLK   << 10;                 /*  VCLK ÓÐÐ§±ßÑØ               */
-    LCDCON5 = (LCDCON5 & ~(1 <<  9)) | INVVLINE  <<  9;                 /*  ÊÇ·ñ·´×ª VLINE              */
-    LCDCON5 = (LCDCON5 & ~(1 <<  8)) | INVVFRAME <<  8;                 /*  ÊÇ·ñ·´×ª VFRAME             */
-    LCDCON5 = (LCDCON5 & ~(1 <<  7)) | INVVD     <<  7;                 /*  ÊÇ·ñ·´×ª VD                 */
-    LCDCON5 = (LCDCON5 & ~(1 <<  6)) | INVVDEN   <<  6;                 /*  ÊÇ·ñ·´×ª VDEN               */
-    LCDCON5 = (LCDCON5 & ~(1 <<  5)) | INVPWREN  <<  5;                 /*  ÊÇ·ñ·´×ª PWREN              */
-    LCDCON5 = (LCDCON5 & ~(1 <<  4)) | INVLEND   <<  4;                 /*  ÊÇ·ñ·´×ª LEND               */
-    LCDCON5 = (LCDCON5 & ~(1 <<  3)) | PWREN     <<  3;                 /*  ÊÇ·ñÊ¹ÄÜ LCD_PWREN Êä³öÐÅºÅ */
-    LCDCON5 = (LCDCON5 & ~(1 <<  2)) | ENLEND    <<  2;                 /*  ÊÇ·ñÊ¹ÄÜ LEND Êä³öÐÅºÅ      */
-    LCDCON5 = (LCDCON5 & ~(1 <<  1)) | BSWP      <<  1;                 /*  ×Ö½ÚÊÇ·ñ½»»»                */
-    LCDCON5 = (LCDCON5 & ~(1 <<  0)) | HWSWP     <<  0;                 /*  °ë×ÖÊÇ·ñ½»»»                */
+    LCDCON5 = (LCDCON5 & ~(1 << 12)) | BPP24BL   << 12;                 /*  24 BPP ï¿½ï¿½Æµï¿½ï¿½ï¿½ï¿½Ö½ï¿½ï¿½ï¿½       */
+    LCDCON5 = (LCDCON5 & ~(1 << 11)) | FRM565    << 11;                 /*  16 BPP ï¿½ï¿½Æµï¿½ï¿½Ý¸ï¿½Ê½         */
+    LCDCON5 = (LCDCON5 & ~(1 << 10)) | INVVCLK   << 10;                 /*  VCLK ï¿½ï¿½Ð§ï¿½ï¿½ï¿½ï¿½               */
+    LCDCON5 = (LCDCON5 & ~(1 <<  9)) | INVVLINE  <<  9;                 /*  ï¿½Ç·ï¿½×ª VLINE              */
+    LCDCON5 = (LCDCON5 & ~(1 <<  8)) | INVVFRAME <<  8;                 /*  ï¿½Ç·ï¿½×ª VFRAME             */
+    LCDCON5 = (LCDCON5 & ~(1 <<  7)) | INVVD     <<  7;                 /*  ï¿½Ç·ï¿½×ª VD                 */
+    LCDCON5 = (LCDCON5 & ~(1 <<  6)) | INVVDEN   <<  6;                 /*  ï¿½Ç·ï¿½×ª VDEN               */
+    LCDCON5 = (LCDCON5 & ~(1 <<  5)) | INVPWREN  <<  5;                 /*  ï¿½Ç·ï¿½×ª PWREN              */
+    LCDCON5 = (LCDCON5 & ~(1 <<  4)) | INVLEND   <<  4;                 /*  ï¿½Ç·ï¿½×ª LEND               */
+    LCDCON5 = (LCDCON5 & ~(1 <<  3)) | PWREN     <<  3;                 /*  ï¿½Ç·ï¿½Ê¹ï¿½ï¿½ LCD_PWREN ï¿½ï¿½ï¿½ï¿½Åºï¿½ */
+    LCDCON5 = (LCDCON5 & ~(1 <<  2)) | ENLEND    <<  2;                 /*  ï¿½Ç·ï¿½Ê¹ï¿½ï¿½ LEND ï¿½ï¿½ï¿½ï¿½Åºï¿½      */
+    LCDCON5 = (LCDCON5 & ~(1 <<  1)) | BSWP      <<  1;                 /*  ï¿½Ö½ï¿½ï¿½Ç·ñ½»»ï¿½                */
+    LCDCON5 = (LCDCON5 & ~(1 <<  0)) | HWSWP     <<  0;                 /*  ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ñ½»»ï¿½                */
 
-    LCDSADDR3 = (LCDSADDR3 & ~(0x7FF << 11)) | OFFSIZE << 11;           /*  ÐéÄâÆÁÄ»Æ«ÒÆ´óÐ¡            */
-    LCDSADDR3 = (LCDSADDR3 & ~(0x7FF)) | PAGEWIDTH;                     /*  ÐéÄâÆÁÄ»¿í¶È                */
+    LCDSADDR3 = (LCDSADDR3 & ~(0x7FF << 11)) | OFFSIZE << 11;           /*  ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä»Æ«ï¿½Æ´ï¿½Ð¡            */
+    LCDSADDR3 = (LCDSADDR3 & ~(0x7FF)) | PAGEWIDTH;                     /*  ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä»ï¿½ï¿½ï¿½                */
     lcd_set_frame_buffer(framebuffer);
-    LCDINTMSK = (LCDINTMSK & ~(0x3)) | 0;                               /*  ÆÁ±ÎÖÐ¶Ï                    */
-    LPCSEL    = (LPCSEL & ~(1)) | 0;                                    /*  ½ûÄÜ LPC3600/LCC3600 Ä£Ê½   */
-    TPAL      = 0x00;                                                   /*  ²»Ê¹ÓÃµ÷É«°å                */
+    LCDINTMSK = (LCDINTMSK & ~(0x3)) | 0;                               /*  ï¿½ï¿½ï¿½ï¿½ï¿½Ð¶ï¿½                    */
+    LPCSEL    = (LPCSEL & ~(1)) | 0;                                    /*  ï¿½ï¿½ï¿½ï¿½ LPC3600/LCC3600 Ä£Ê½   */
+    TPAL      = 0x00;                                                   /*  ï¿½ï¿½Ê¹ï¿½Ãµï¿½É«ï¿½ï¿½                */
 }
 
 void lcd_set_frame_buffer( unsigned short *b )
 {
 
-    /* ÊÓÆµÖ¡»º³åÇøÄÚ´æµØÖ·¸ßÎ»[30:22]  -> LCDSADDR1[29:21] */
+    /* ï¿½ï¿½ÆµÖ¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú´ï¿½ï¿½Ö·ï¿½ï¿½Î»[30:22]  -> LCDSADDR1[29:21] */
     LCDSADDR1 = (LCDSADDR1 & ~(0x1FF << 21)) | (((uint32_t)b >> 22) & 0x1FF) << 21;
 
-    /* ÊÓÆµÖ¡»º³åÇøÄÚ´æµØÖ·µÍÎ»[21:1]   -> LCDSADDR1[20:0] */
+    /* ï¿½ï¿½ÆµÖ¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú´ï¿½ï¿½Ö·ï¿½ï¿½Î»[21:1]   -> LCDSADDR1[20:0] */
     LCDSADDR1 = (LCDSADDR1 & ~(0x1FFFFF)) | (((uint32_t)b >> 1) & 0x1FFFFF);
 
-    /* ÊÓÆµÖ¡»º³åÇøµÄ½áÊøµØÖ·µÍÎ»[21:1] -> LCDSADDR2[20:0] */
+    /* ï¿½ï¿½ÆµÖ¡ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä½ï¿½ï¿½ï¿½ï¿½Ö·ï¿½ï¿½Î»[21:1] -> LCDSADDR2[20:0] */
     LCDSADDR2 = (LCDSADDR2 & ~(0x1FFFFF)) | ((((uint32_t)b + LINEVAL * HOZVAL * 2) >> 1) & 0x1FFFFF);
 }
 
 /*
- * ´ò¿ª FrameBuffer
+ * ï¿½ï¿½ FrameBuffer
  */
 void * fb_open( void )
 {
-    LCDCON1 = (LCDCON1 & ~(1)) | ENVID;                                 /*  ¿ªÆôÊÓÆµÊä³ö                */
+    LCDCON1 = (LCDCON1 & ~(1)) | ENVID;                                 /*  ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æµï¿½ï¿½ï¿½                */
     return framebuffer;
 }
 static int g_current;
@@ -192,11 +192,11 @@ void fb_flip( void )
 	}
 }
 /*
- * ¹Ø±Õ FrameBuffer
+ * ï¿½Ø±ï¿½ FrameBuffer
  */
 int fb_close( void )
 {
-    LCDCON1 = (LCDCON1 & ~(1)) | 0;                                     /*  ¹Ø±ÕÊÓÆµÊä³ö                */
+    LCDCON1 = (LCDCON1 & ~(1)) | 0;                                     /*  ï¿½Ø±ï¿½ï¿½ï¿½Æµï¿½ï¿½ï¿½                */
     return 0;
 }
 

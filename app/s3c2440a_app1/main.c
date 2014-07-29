@@ -54,10 +54,10 @@ static void led_task1( void *pa, void *pb)
 }
 
 #define MAX_T 1000
-tcb_t *tcbs[MAX_T];
+struct rtk_tcb *tcbs[MAX_T];
 #define MAX_M 50
-mutex_t mutexs[1000];
-semaphore_t sem;
+struct rtk_mutex mutexs[1000];
+struct rtk_semaphore sem;
 
 static void swap( int *a, int *b)
 {
@@ -75,7 +75,7 @@ void mtask( void )
     uint32_t total;
     uint32_t used;
     uint32_t max_used;
-    mutex_t *pm[MAX_M];
+    struct rtk_mutex *pm[MAX_M];
     int order[MAX_M];
     int n;
     int size;
@@ -100,9 +100,9 @@ void mtask( void )
             pm[i] = &mutexs[ rand()%(sizeof(mutexs)/sizeof(mutexs[0])) ];
             ret = mutex_lock( pm[i], /*rand()%100 + 100*/-1 );
             if ( ret ) {
-                kprintf("%s: (%d)@%d mutex_lock error: ret=%d\n",CURRENT_TASK_NAME(), ptcb_current->priority, ptcb_current->current_priority, ret );
+                kprintf("%s: (%d)@%d mutex_lock error: ret=%d\n",CURRENT_TASK_NAME(), rtk_ptcb_current->priority, rtk_ptcb_current->current_priority, ret );
             } else {
-                kprintf("%s: (%d)@%d mutex_lock OK\n", CURRENT_TASK_NAME(), ptcb_current->priority, ptcb_current->current_priority);
+                kprintf("%s: (%d)@%d mutex_lock OK\n", CURRENT_TASK_NAME(), rtk_ptcb_current->priority, rtk_ptcb_current->current_priority);
             }
         }
         //p = malloc( size );
@@ -115,7 +115,7 @@ void mtask( void )
             mutex_unlock( pm[order[n-1-i]] );
         }
         memory_info( &total, &used, &max_used  );
-        kprintf("%s : (%d) running at %d malloc info: %d(%X) %d %d\n",CURRENT_TASK_NAME(), ptcb_current->priority, ptcb_current->current_priority, total, total, used, max_used );
+        kprintf("%s : (%d) running at %d malloc info: %d(%X) %d %d\n",CURRENT_TASK_NAME(), rtk_ptcb_current->priority, rtk_ptcb_current->current_priority, total, total, used, max_used );
         //if ( p ) {
         //    free(p);
         //}
@@ -141,7 +141,7 @@ void *fb_back_get( void );void fb_flip( void );
 
 void main_task( void *pa, void *pb)
 {
-    tcb_t      *ptcb;
+    struct rtk_tcb      *ptcb;
     extern int  __sys_heap_start__;
     extern int  __sys_heap_end__;
     int         i = 0;
@@ -156,7 +156,7 @@ void main_task( void *pa, void *pb)
     system_heap_init( &__sys_heap_start__, &__sys_heap_end__ );
 
     /* os_clk_init(); */
-    kprintf("sizeof tcb=%d\n", sizeof(tcb_t));
+    kprintf("sizeof tcb=%d\n", sizeof(struct rtk_tcb));
 
     for (i=0; i<sizeof(mutexs)/sizeof(mutexs[0]); i++) {
         mutex_init( &mutexs[i] );
@@ -181,8 +181,8 @@ void main_task( void *pa, void *pb)
     while (9) {
         color = rand();
         frame_buffer = fb_back_get();
-        for (x=0; x<240; x++) {
-            for (y=0; y<320; y++) {
+        for (x=0; x<480; x++) {
+            for (y=0; y<600; y++) {
                 *(frame_buffer+x+y*240) = color;
             }
         }
@@ -217,7 +217,7 @@ int main()
     enable_mmu( (unsigned int)&lds_mmu_table_address );
 
     
-    kernel_init();
+    rtk_init();
     
     TASK_INIT( "led",  info_led,   6, led_task,  0, 0 );
     TASK_INIT( "led",  info_led1,   5, led_task1,  0, 0 );
@@ -230,6 +230,7 @@ int main()
     TASK_STARTUP(info_uart2);
     TASK_STARTUP(info_root);
     
-    os_startup();
+    rtk_startup();
+    
     return 0;
 }

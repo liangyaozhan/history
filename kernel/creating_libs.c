@@ -1,20 +1,20 @@
-/* Last modified Time-stamp: <2012-10-30 08:04:45 Tuesday by lyzh>
+/* Last modified Time-stamp: <2014-07-29 10:07:13, by lyzh>
  * @(#)creating_libs.c
  */
 
 #include "rtk.h"
 #include "rtklib.h"
 
-mutex_t *mutex_create( void )
+struct rtk_mutex *mutex_create( void )
 {
-    mutex_t *p = (mutex_t*)malloc(sizeof(mutex_t));
+    struct rtk_mutex *p = (struct rtk_mutex*)malloc(sizeof(struct rtk_mutex));
     if ( p ) {
         mutex_init( p );
     }
     return p;
 }
 
-void mutex_delete( mutex_t *mutex )
+void mutex_delete( struct rtk_mutex *mutex )
 {
     if ( mutex ) {
         mutex_terminate( mutex );
@@ -22,18 +22,18 @@ void mutex_delete( mutex_t *mutex )
     }
 }
 
-semaphore_t *semc_create( int init_count )
+struct rtk_semaphore *semc_create( int init_count )
 {
-    semaphore_t *p;
+    struct rtk_semaphore *p;
 
-    p = malloc( sizeof(semaphore_t) );
+    p = malloc( sizeof(struct rtk_semaphore) );
     if (p) {
         semc_init( p, init_count );
     }
     return p;
 }
 
-void semc_delete( semaphore_t *semid )
+void semc_delete( struct rtk_semaphore *semid )
 {
     if ( semid ) {
         semc_terminate( semid );
@@ -41,18 +41,18 @@ void semc_delete( semaphore_t *semid )
     }
 }
 
-semaphore_t *semb_create( int init_count )
+struct rtk_semaphore *semb_create( int init_count )
 {
-    semaphore_t *p;
+    struct rtk_semaphore *p;
 
-    p = malloc( sizeof(semaphore_t) );
+    p = malloc( sizeof(struct rtk_semaphore) );
     if (p) {
         semb_init( p, init_count );
     }
     return p;
 }
 
-void semb_delete( semaphore_t *semid )
+void semb_delete( struct rtk_semaphore *semid )
 {
     if ( semid ) {
         semb_terminate( semid );
@@ -60,7 +60,7 @@ void semb_delete( semaphore_t *semid )
     }
 }
 
-tcb_t *task_create(const char *name,
+struct rtk_tcb *task_create(const char *name,
                    int         priority, /* priority of new task */
                    int         stack_size,
                    int         option, /* task option word */
@@ -68,12 +68,12 @@ tcb_t *task_create(const char *name,
                    void       *arg1, /* 1st of 10 req'd args to pass to entryPt */
                    void       *arg2)
 {
-    tcb_t *p;
+    struct rtk_tcb *p;
     char  *stack;
     int    len = strlen( name )+1;
 
-    p = malloc( sizeof( tcb_t ) + stack_size+len );
-    stack = (char*)p + sizeof( tcb_t );
+    p = malloc( sizeof( struct rtk_tcb ) + stack_size+len );
+    stack = (char*)p + sizeof( struct rtk_tcb );
     if ( !p ) {
         goto err_done;
     }
@@ -89,12 +89,12 @@ err_done:
     return NULL;
 }
 
-int task_delete( tcb_t *ptcb )
+int task_delete( struct rtk_tcb *ptcb )
 {
     int flag = 1;
     int ret;
     
-    if ( ptcb == NULL || ptcb == ptcb_current ) {
+    if ( ptcb == NULL || ptcb == rtk_ptcb_current ) {
         /*
          *  TODO: how to free memory?
          */
@@ -107,20 +107,20 @@ int task_delete( tcb_t *ptcb )
     return ret;
 }
 
-msgq_t *msgq_create( int element_size, int element_count )
+struct rtk_msgq *msgq_create( int element_size, int element_count )
 {
-    msgq_t *p;
+    struct rtk_msgq *p;
     int     size;
 
     size = element_size*element_count;
-    p = (msgq_t*) malloc( size + sizeof (msgq_t) );
+    p = (struct rtk_msgq*) malloc( size + sizeof (struct rtk_msgq) );
     if ( p ) {
-        msgq_init( p, (char*)p+sizeof(msgq_t), size, element_size );
+        msgq_init( p, (char*)p+sizeof(struct rtk_msgq), size, element_size );
     }
     return p;
 }
 
-void msgq_delete( msgq_t *pmsgq )
+void msgq_delete( struct rtk_msgq *pmsgq )
 {
     msgq_terminate( pmsgq );
     free( pmsgq );

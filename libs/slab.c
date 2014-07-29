@@ -56,6 +56,13 @@
 #include "rtk.h"
 #include "rtklib.h"
 
+#define size_t unsigned int
+
+#define ROUND_DOWN(p, d)        (((int)p - ((d)-1)) & (~(d-1)))
+#ifndef ROUND_UP
+#define ROUND_UP(x, align)  (((int) (x) + (align - 1)) & ~(align - 1))
+#endif
+
 #define RT_NULL ((void*)0)
 #define rt_inline   __inline
 #define RT_DEBUG_NOT_IN_INTERRUPT   do{}while (0)
@@ -242,7 +249,7 @@ struct rt_page_head
 	char dummy[RT_MM_PAGE_SIZE - (sizeof(struct rt_page_head*) + sizeof (size_t))];
 };
 static struct rt_page_head *rt_page_list;
-static mutex_t heap_sem;
+static struct rtk_mutex heap_sem;
 
 void *rt_page_alloc(size_t npages)
 {
