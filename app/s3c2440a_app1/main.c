@@ -100,9 +100,9 @@ void mtask( void )
             pm[i] = &mutexs[ rand()%(sizeof(mutexs)/sizeof(mutexs[0])) ];
             ret = mutex_lock( pm[i], /*rand()%100 + 100*/-1 );
             if ( ret ) {
-                kprintf("%s: (%d)@%d mutex_lock error: ret=%d\n",CURRENT_TASK_NAME(), rtk_ptcb_current->priority, rtk_ptcb_current->current_priority, ret );
+                kprintf("%s: (%d)@%d mutex_lock error: ret=%d\n",CURRENT_TASK_NAME(), rtk_self()->priority, rtk_self()->current_priority, ret );
             } else {
-                kprintf("%s: (%d)@%d mutex_lock OK\n", CURRENT_TASK_NAME(), rtk_ptcb_current->priority, rtk_ptcb_current->current_priority);
+                kprintf("%s: (%d)@%d mutex_lock OK\n", CURRENT_TASK_NAME(), rtk_self()->priority, rtk_self()->current_priority);
             }
         }
         //p = malloc( size );
@@ -115,7 +115,7 @@ void mtask( void )
             mutex_unlock( pm[order[n-1-i]] );
         }
         memory_info( &total, &used, &max_used  );
-        kprintf("%s : (%d) running at %d malloc info: %d(%X) %d %d\n",CURRENT_TASK_NAME(), rtk_ptcb_current->priority, rtk_ptcb_current->current_priority, total, total, used, max_used );
+        kprintf("%s : (%d) running at %d malloc info: %d(%X) %d %d\n",CURRENT_TASK_NAME(), rtk_self()->priority, rtk_self()->current_priority, total, total, used, max_used );
         //if ( p ) {
         //    free(p);
         //}
@@ -203,11 +203,11 @@ int main()
     static int fiq_stack[1024];
     static int abort_stack[1024];
 
-    TASK_INFO_DECL(static, info_uart1, 512*16);
-    TASK_INFO_DECL(static, info_uart2, 512*16);
-    TASK_INFO_DECL(static, info_led,   512*16);
-    TASK_INFO_DECL(static, info_led1,   512*16);
-    TASK_INFO_DECL(static, info_root,  1024*4);
+    static TASK_INFO_DECL( info_uart1, 512*16);
+    static TASK_INFO_DECL( info_uart2, 512*16);
+    static TASK_INFO_DECL( info_led,   512*16);
+    static TASK_INFO_DECL( info_led1,   512*16);
+    static TASK_INFO_DECL( info_root,  1024*4);
     
     arch_interrupt_disable();
 

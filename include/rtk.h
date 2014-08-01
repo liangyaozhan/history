@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-07-29 10:14:23, by lyzh>
+/* Last modified Time-stamp: <2014-08-01 19:23:08, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -73,26 +73,26 @@ struct rtk_private_priority_q_node
  */
 struct rtk_tcb
 {
-    void             *sp;                   /*!< stack pointor, will keep it the first one */
-    const char       *name;                 /*!< task's name            */
-    char             *stack_low;            /*!< stack low pointor      */
-    char             *stack_high;           /*!< stack high pointor     */
-    struct rtk_private_priority_q_node  prio_node;    /*!< node in priority Q     */
-    struct rtk_tick   tick_node;            /*!< node in softtimer Q    */
-    struct list_head  sem_node;             /*!< node in pending Q      */
-    struct list_head *psem_list;            /*!< pend node if any       */
+    void                               *sp; /*!< stack pointor, will keep it the first one */
+    const char                         *name; /*!< task's name            */
+    char                               *stack_low; /*!< stack low pointor      */
+    char                               *stack_high; /*!< stack high pointor     */
+    struct rtk_private_priority_q_node  prio_node; /*!< node in priority Q     */
+    struct rtk_tick                     tick_node; /*!< node in softtimer Q    */
+    struct list_head                    sem_node; /*!< node in pending Q      */
+    struct list_head                   *psem_list; /*!< pend node if any       */
 #if CONFIG_MUTEX_EN
-    struct list_head  mutex_holded_head;    /*!< remember all mutex     */
-    int               priority;             /*!< normal priority        */
+    struct list_head                    mutex_holded_head; /*!< remember all mutex     */
+    int                                 priority; /*!< normal priority        */
 #endif
-    struct list_head  task_list_node;       /*!< node in task list      */
-    int               option;               /*!< for the further        */
-    int               current_priority;     /*!< running priority       */
-    int               err;                  /*!< errno used internal    */
+    struct list_head                    task_list_node; /*!< node in task list      */
+    int                                 option; /*!< for the further        */
+    int                                 current_priority; /*!< running priority       */
+    int                                 err; /*!< errno used internal    */
 #if CONFIG_TASK_TERMINATE_EN
-    int               safe_count;           /*!< prevent task deletion  */
+    int                                 safe_count; /*!< prevent task deletion  */
 #endif
-    int               status;                             /*!< task status            */
+    int                                 status; /*!< task status            */
 };
 
 
@@ -192,16 +192,6 @@ struct rtk_msgq
  *  @}
  */
 
-/**
- *  @name namespace
- *  @{
- */
-#define GLOBAL          /*!< global name space used for MSGQ_DECL_xxx...    */
-#define IMPORT  extern  /*!< import name space used for MSGQ_DECL_xxx...    */
-#define LOCAL   static  /*!< static name space used for MSGQ_DECL_xxx...    */
-/**
- *  @}
- */
 
 /**
  *  @defgroup API
@@ -230,8 +220,8 @@ struct rtk_msgq
  *  {
  *      int priority1 = 10;
  *      int priority2 = 20;
- *      TASK_INFO_DECL(static, info1, 1024);
- *      TASK_INFO_DECL(static, info2, 1024);
+ *      static TASK_INFO_DECL(info1, 1024);
+ *      static TASK_INFO_DECL(info2, 1024);
  *      
  *      arch_interrupt_disable();
  *      kernel_init();
@@ -245,7 +235,7 @@ struct rtk_msgq
  *  }
  *  @endcode
  */
-#define TASK_INFO_DECL(zone, info, stack_size) zone struct __taskinfo_##info {struct rtk_tcb tcb; char stack[stack_size]; }info
+#define TASK_INFO_DECL(info, stack_size) struct __taskinfo_##info {struct rtk_tcb tcb; char stack[stack_size]; }info
 
 /**
  *  @brief init task infomation
@@ -358,17 +348,17 @@ int task_unsafe( void );
 /**
  *  @brief current task name
  */
-#define CURRENT_TASK_NAME() (rtk_ptcb_current->name+0)
+#define CURRENT_TASK_NAME() (rtk_self()->name+0)
 
 /**
  *  @brief current task priority
  */
-#define CURRENT_TASK_PRIORITY() (rtk_ptcb_current->priority+0)
+#define CURRENT_TASK_PRIORITY() (rtk_self()->priority+0)
 
 /**
  *  @brief current task errno
  */
-#define CURRENT_TASK_ERR() (rtk_ptcb_current->err+0)
+#define CURRENT_TASK_ERR() (rtk_self()->err+0)
 
 /**
  *  @}
@@ -415,24 +405,24 @@ int task_unsafe( void );
 /**
  *  @brief semaphore binary declaration macro.
  */
-#define SEM_BINARY_DECL(zone, name, init_value)  zone SEM_DECL(name, SEM_TYPE_BINARY, init_value)
+#define SEM_BINARY_DECL(name, init_value)  SEM_DECL(name, SEM_TYPE_BINARY, init_value)
 
 /**
  *  @brief semaphore counter declaration macro.
  */
-#define SEM_COUNT_DECL(zone, name, init_value)   zone SEM_DECL(name, SEM_TYPE_COUNTER, init_value)
+#define SEM_COUNT_DECL(name, init_value)   SEM_DECL(name, SEM_TYPE_COUNTER, init_value)
 
 /**
  *  @brief mutex declaration macro.
  */
-#define MUTEX_DECL(zone, var)                                  \
-    zone struct rtk_mutex var={                                        \
-        {                                                \
-            {0}, LIST_HEAD_INIT((var).s.pending_tasks),  \
-            SEM_TYPE_MUTEX,                              \
-        },                                               \
-        LIST_HEAD_INIT((var).sem_member_node),           \
-        0,                                               \
+#define MUTEX_DECL(var)                                           \
+    struct rtk_mutex var={                                        \
+        {                                                         \
+            {0}, LIST_HEAD_INIT((var).s.pending_tasks),           \
+            SEM_TYPE_MUTEX,                                       \
+        },                                                        \
+        LIST_HEAD_INIT((var).sem_member_node),                    \
+        0,                                                        \
     }
     
 /**
@@ -778,7 +768,7 @@ extern struct list_head g_systerm_tasks_head;
  *
  * @ATTENTION  you should NEVER modify it. 
  */
-extern struct rtk_tcb *rtk_ptcb_current;
+extern struct rtk_tcb *rtk_self(void);
 
 
 /**

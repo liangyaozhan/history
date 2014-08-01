@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-07-29 10:07:13, by lyzh>
+/* Last modified Time-stamp: <2014-08-01 18:51:58, by lyzh>
  * @(#)creating_libs.c
  */
 
@@ -94,7 +94,7 @@ int task_delete( struct rtk_tcb *ptcb )
     int flag = 1;
     int ret;
     
-    if ( ptcb == NULL || ptcb == rtk_ptcb_current ) {
+    if ( ptcb == NULL || ptcb == rtk_self() ) {
         /*
          *  TODO: how to free memory?
          */

@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-08-01 18:33:52, by lyzh>
+/* Last modified Time-stamp: <2014-08-01 19:23:23, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -70,7 +70,7 @@ typedef struct __priority_q_bitmap_head priority_q_bitmap_head_t;
 static priority_q_bitmap_head_t  g_readyq;
 static struct list_head          g_softtime_head;
 volatile unsigned long           g_systick;
-struct rtk_tcb                  *rtk_ptcb_current;
+static struct rtk_tcb           *rtk_ptcb_current;
 int                              is_int_context;
 struct list_head                 g_systerm_tasks_head;
 
@@ -114,6 +114,12 @@ static int            __mutex_dead_lock_detected( struct rtk_mutex * semid );
 void                  __mutex_dead_lock_show( struct rtk_mutex *mutex );
 #endif
 static void           task_exit( void );
+
+
+struct rtk_tcb *rtk_self(void)
+{
+    return rtk_ptcb_current;
+}
 
 static
 void priority_q_init( void )
@@ -1350,7 +1356,7 @@ void exit_int_context( void )
 
 void rtk_init( void )
 {
-    TASK_INFO_DECL(static, info1, IDLE_TASK_STACK_SIZE );
+    static TASK_INFO_DECL( info1, IDLE_TASK_STACK_SIZE );
     
     INIT_LIST_HEAD( &g_systerm_tasks_head );
     INIT_LIST_HEAD(&g_softtime_head);

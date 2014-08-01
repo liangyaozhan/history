@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-07-29 09:29:54, by lyzh>
+/* Last modified Time-stamp: <2014-08-01 19:24:20, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -37,7 +37,7 @@ int serial_puts(const char *str);
 #endif
 
 
-MUTEX_DECL(static, kprintf_mutex);
+static MUTEX_DECL( kprintf_mutex);
 
 int kprintf( const char* str, ... )
 {
