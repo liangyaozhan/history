@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-07-29 10:21:48, by lyzh>
+/* Last modified Time-stamp: <2014-08-01 18:33:52, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -57,7 +57,7 @@ typedef struct rtk_private_priority_q_node pqn_t;
 
 struct __priority_q_bitmap_head
 {
-    pqn_t       *phighest_node;
+    pqn_t            *phighest_node;
     unsigned int      bitmap_group;
     uint32_t          bitmap_tasks[__MAX_GROUPS];
     struct list_head  tasks[MAX_PRIORITY+1];
@@ -70,7 +70,7 @@ typedef struct __priority_q_bitmap_head priority_q_bitmap_head_t;
 static priority_q_bitmap_head_t  g_readyq;
 static struct list_head          g_softtime_head;
 volatile unsigned long           g_systick;
-struct rtk_tcb                           *rtk_ptcb_current;
+struct rtk_tcb                  *rtk_ptcb_current;
 int                              is_int_context;
 struct list_head                 g_systerm_tasks_head;
 
@@ -99,7 +99,7 @@ static void           __release_one_mutex( struct rtk_mutex *semid );
 static int            __mutex_raise_owner_priority( struct rtk_mutex *semid, int priority );
 static int            __insert_pend_list_and_trig( struct rtk_semaphore *semid, struct rtk_tcb *ptcb );
 #endif
-static struct rtk_tcb         *highest_tcb_get( void );
+static struct rtk_tcb*highest_tcb_get( void );
 extern void           arch_context_switch(void **fromsp, void **tosp);
 extern void           arch_context_switch_interrupt(void **fromsp, void **tosp);
 void                  arch_context_switch_to(void **sp);
@@ -731,7 +731,7 @@ int mutex_lock( struct rtk_mutex *semid, unsigned int tick )
     /*
      *  put tcb into pend list and inherit priority.
      */
-    if ( __insert_pend_list_and_trig( (struct rtk_semaphore*)semid, rtk_ptcb_current ) ) {
+    if ( __insert_pend_list_and_trig( &semid->s, rtk_ptcb_current ) ) {
         __mutex_raise_owner_priority( semid, rtk_ptcb_current->current_priority );
     }
     do {
@@ -887,7 +887,7 @@ int __get_pend_list_priority ( struct rtk_semaphore *semid )
 static inline
 void __put_tcb_to_pendlist( struct rtk_semaphore *semid, struct rtk_tcb *ptcbToAdd )
 {
-    struct rtk_tcb            *ptcb;
+    struct rtk_tcb   *ptcb;
     struct list_head *p;
 
     list_for_each( p, &semid->pending_tasks) {
@@ -917,7 +917,7 @@ int __sem_wakeup_pender( struct rtk_semaphore *semid, int err, int count )
     register int               n;
     register struct list_head *p;
     register struct list_head *save;
-    register struct rtk_tcb            *ptcbwakeup;
+    register struct rtk_tcb   *ptcbwakeup;
 
     n = 0;
     list_for_each_safe( p, save, &semid->pending_tasks ) {
@@ -1457,11 +1457,11 @@ int msgq_receive( struct rtk_msgq *pmsgq, void *buff, int buff_size, int tick )
         pmsgq->rd = 0;
     }
 
-    arch_interrupt_enable(old);
-
     if ( buff ) {
         memcpy( buff, pmsgq->buff + pmsgq->unit_size*rd, pmsgq->unit_size );
     }
+    
+    arch_interrupt_enable(old);
 
     semc_give( &pmsgq->sem_wr );
     return 0;
@@ -1509,11 +1509,11 @@ int msgq_send( struct rtk_msgq *pmsgq, const void *buff, int size, int tick )
     wr = pmsgq->wr;
     pmsgq->wr = next;
     
-    arch_interrupt_enable(old);
-
     if ( buff ) {
         memcpy( pmsgq->buff + pmsgq->unit_size*wr, buff, int_min(pmsgq->unit_size, size) );
     }
+    
+    arch_interrupt_enable(old);
 
     semc_give( &pmsgq->sem_rd );
     return 0;

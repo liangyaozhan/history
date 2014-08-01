@@ -457,6 +457,18 @@ static inline void list_splice_tail_init(struct list_head *list,
 	     pos = list_entry(pos->member.next, typeof(*pos), member))
 
 /**
+ * list_for_each_entry	-	iterate over list of given type
+ * @pos:	the type * to use as a loop cursor.
+ * @t:      the type, in case where not gcc.
+ * @head:	the head for your list.
+ * @member:	the name of the list_struct within the struct.
+ */
+#define list_for_each_entry_type(pos, t, head, member)              \
+	for (pos = list_entry((head)->next, t, member);      \
+	     &pos->member != (head);                                    \
+	     pos = list_entry(pos->member.next, t, member))
+
+/**
  * list_for_each_entry_reverse - iterate backwards over list of given type.
  * @pos:	the type * to use as a loop cursor.
  * @head:	the head for your list.
@@ -466,6 +478,12 @@ static inline void list_splice_tail_init(struct list_head *list,
 	for (pos = list_entry((head)->prev, typeof(*pos), member);	\
 	     &pos->member != (head); 	\
 	     pos = list_entry(pos->member.prev, typeof(*pos), member))
+
+#define list_for_each_entry_reverse_type(pos, t, head, member)        \
+	for (pos = list_entry((head)->prev, t, member);      \
+	     &pos->member != (head);                                    \
+	     pos = list_entry(pos->member.prev, t, member))
+
 
 /**
  * list_prepare_entry - prepare a pos entry for use in list_for_each_entry_continue()
