@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-08-04 12:34:12, by lyzh>
+/* Last modified Time-stamp: <2014-08-04 12:56:27, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -82,7 +82,7 @@ static priority_q_bitmap_head_t  g_readyq;
 static struct list_head          g_softtime_head;
 volatile unsigned long           g_systick;
 static struct rtk_tcb           *rtk_ptcb_current;
-int                              is_int_context;
+int                              rtk_is_int_context;
 struct list_head                 g_systerm_tasks_head;
 
 /**
@@ -1403,7 +1403,7 @@ void enter_int_context( void )
 {
     int old;
     old = arch_interrupt_disable();
-    ++is_int_context;
+    ++rtk_is_int_context;
     arch_interrupt_enable( old );
 }
 void exit_int_context( void )
@@ -1411,14 +1411,14 @@ void exit_int_context( void )
     int old;
     schedule();
     old = arch_interrupt_disable();
-    --is_int_context;
+    --rtk_is_int_context;
     arch_interrupt_enable( old );
 }
 
 
 void rtk_init( void )
 {
-    static TASK_INFO_DECL( info1, IDLE_TASK_STACK_SIZE );
+    static TASK_INFO_DEF( info1, IDLE_TASK_STACK_SIZE );
     
     INIT_LIST_HEAD( &g_systerm_tasks_head );
     INIT_LIST_HEAD(&g_softtime_head);

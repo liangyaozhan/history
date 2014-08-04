@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-08-04 12:32:15, by lyzh>
+/* Last modified Time-stamp: <2014-08-04 12:56:13, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -179,6 +179,7 @@ struct rtk_msgq
  *  @defgroup struct rtk_semaphoreype    semaphore type
  *  @{
  */
+#define SEM_TYPE_NULL       0x00    /*!< semaphore type: NULL    */
 #define SEM_TYPE_BINARY     0x01    /*!< semaphore type: binary  */
 #define SEM_TYPE_COUNTER    0x02    /*!< semaphore type: counter */
 #define SEM_TYPE_MUTEX      0x03    /*!< semaphore type: mutex   */
@@ -242,7 +243,8 @@ struct rtk_msgq
  *  }
  *  @endcode
  */
-#define TASK_INFO_DECL(info, stack_size) struct __taskinfo_##info {struct rtk_tcb tcb; char stack[stack_size]; }info
+/* #define TASK_INFO_DECL(info, stack_size) struct __taskinfo_##info {struct rtk_tcb tcb; char stack[stack_size]; }info */
+#define TASK_INFO_DEF(info, stack_size) struct __taskinfo_##info {struct rtk_tcb tcb; char stack[stack_size]; }info
 
 /**
  *  @brief init task infomation
@@ -402,8 +404,9 @@ int task_unsafe( void );
  *  }
  *  @endcode
  */
-#define SEM_DECL( sem, t, init)                 \
-    struct rtk_semaphore sem; struct rtk_semaphore sem = {                         \
+#define SEM_DECL(sem) struct rtk_semaphore sem
+#define SEM_DEF( sem, t, init)                 \
+    struct rtk_semaphore sem; struct rtk_semaphore sem = {  \
         {init},                                 \
         LIST_HEAD_INIT(sem.pending_tasks),      \
         t,                                      \
@@ -412,17 +415,20 @@ int task_unsafe( void );
 /**
  *  @brief semaphore binary declaration macro.
  */
-#define SEM_BINARY_DECL(name, init_value)  SEM_DECL(name, SEM_TYPE_BINARY, init_value)
+#define SEM_BINARY_DECL(name, init_value)  SEM_DECL(name)
+#define SEM_BINARY_DEF(name, init_value)  SEM_DECL(name, SEM_TYPE_BINARY, init_value)
 
 /**
  *  @brief semaphore counter declaration macro.
  */
-#define SEM_COUNT_DECL(name, init_value)   SEM_DECL(name, SEM_TYPE_COUNTER, init_value)
+#define SEM_COUNT_DECL(name)   SEM_DECL(name)
+#define SEM_COUNT_DEF(name, init_value)   SEM_DECL(name, SEM_TYPE_COUNTER, init_value)
 
 /**
  *  @brief mutex declaration macro.
  */
-#define MUTEX_DECL(var)                                           \
+#define MUTEX_DECL(var) struct rtk_mutex var
+#define MUTEX_DEF(var)                                            \
     struct rtk_mutex var={                                        \
         {                                                         \
             {0}, LIST_HEAD_INIT((var).s.pending_tasks),           \
@@ -657,10 +663,13 @@ int mutex_terminate( struct rtk_mutex *mutex );
  *  }
  *  @endcode
  */
-#define MSGQ_DECL_NO_INIT(namespace, name, buffersize )                 \
-    namespace char __msgqbuff##name[buffersize];                        \
-    namespace struct rtk_msgq name
-#define MSGQ_DO_INIT(name, unitsize)  msgq_init( &name, __msgqbuff##name, sizeof(__msgqbuff##name), unitsize)
+#define MSGQ_DECL(name, buffersize ) 
+#define MSGQ_DEF_NO_INIT(name, buffersize )                             \
+    struct __msgq_def_##name {                                          \
+        char   buffer[buffersize];                                      \
+        struct rtk_msgq msgq;                                           \
+    } name;
+#define MSGQ_DO_INIT(name, unitsize)  msgq_init( &name.msgq, msgq.buffer, sizeof(msgq.buffer), unitsize)
 
 /**
  *  \brief Initialize a message queue.
@@ -757,9 +766,9 @@ void enter_int_context( void );
 void exit_int_context( void );
 int  kprintf ( const char* str, ... );
 
-extern int is_int_context;
+extern int rtk_is_int_context;
 extern void schedule(void);
-#define IS_INT_CONTEXT()        (is_int_context>0)
+#define IS_INT_CONTEXT()        (rtk_is_int_context>0)
 #define ENTER_INT_CONTEXT()     enter_int_context()
 #define EXIT_INT_CONTEXT()      exit_int_context()
 
@@ -769,7 +778,6 @@ extern void schedule(void);
  *
  * internal used currently
  */
-extern struct list_head g_systerm_tasks_head;
 /**
  * @brief pontor of current task control bock.
  *

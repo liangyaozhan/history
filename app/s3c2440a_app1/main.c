@@ -203,11 +203,11 @@ int main()
     static int fiq_stack[1024];
     static int abort_stack[1024];
 
-    static TASK_INFO_DECL( info_uart1, 512*16);
-    static TASK_INFO_DECL( info_uart2, 512*16);
-    static TASK_INFO_DECL( info_led,   512*16);
-    static TASK_INFO_DECL( info_led1,   512*16);
-    static TASK_INFO_DECL( info_root,  1024*4);
+    static TASK_INFO_DEF( info_uart1, 512*16);
+    static TASK_INFO_DEF( info_uart2, 512*16);
+    static TASK_INFO_DEF( info_led,   512*16);
+    static TASK_INFO_DEF( info_led1,   512*16);
+    static TASK_INFO_DEF( info_root,  1024*4);
 
     
     
