@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-08-03 19:27:55, by lyzh>
+/* Last modified Time-stamp: <2014-08-04 12:34:12, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -21,34 +21,11 @@
  *  task status:
  *
  *  READY 0:
- *      1. in ready Q.
- *      2. status = 0.
- *      3. not in delay Q.
- *
  *  only PENDING 1:
- *      1. pend resource forever.
- *      2. not in ready Q.
- *      3. status = 1.
- *      4. not in delay Q.
- *  
  *  only DELAY   2:
- *      1. task delayed.
- *      2. not pending resource.
- *      3. not in ready Q.
- *      4. status = 2;
- *
  *  PENDING&DELAY 3
- *      1. pending resource.
- *      2. task_delayed.
- *      3. not in ready Q.
- *      4. status = 3;
- *
  *  TASK_DEAD: 0xF0
- *      a deleting task.
- *
  *  TASK_PREPARED: 0x5c
- *      1. task inited.
- *      2. task not started.
  *  
  */
 #include "list.h"
@@ -62,9 +39,10 @@
 #define READY_Q_REMOVE( ptcb )          priority_q_remove( &(ptcb)->prio_node )
 #define READY_Q_PUT( ptcb, key)         priority_q_put(&(ptcb)->prio_node, key)
 #define DELAY_Q_PUT(ptcb, tick)         rtk_tick_down_counter_add( &(ptcb)->tick_node, tick )
-#define DELAY_Q_REMOVE(ptcb)            rtk_tick_down_counter_remove( &(ptcb)->tick_node )
 #define PLIST_PTR_TO_SEMID( ptr )       list_entry( (ptr), struct rtk_semaphore, pending_tasks )
 #define SEM_MEMBER_PTR_TO_SEMID( ptr )  list_entry( (ptr), struct rtk_mutex, sem_member_node )
+#define __task_detach_delay_counter(task) rtk_tick_down_counter_remove( &task->tick_node );
+
 #ifndef NULL
 #define NULL                       ((void*)0)
 #endif
@@ -115,7 +93,8 @@ extern int rtk_ffs( register unsigned int q );
 
 void *memcpy(void*,const void*,int);
 static inline void    __sem_add_pending_task( struct rtk_semaphore *semid, struct rtk_tcb *pendingtask );
-static inline void    __sem_remove_pending_task( struct rtk_semaphore *semid, struct rtk_tcb *pendingtask );
+static inline void    __task_detach_pending_sem( struct rtk_tcb *task );
+static inline void    __sem_remove_pending_task( struct rtk_tcb *task );
 static inline int     __sem_pend_list_priority_get ( struct rtk_semaphore *semid );
 static void           task_delay_timeout( struct rtk_tick *pdn );
 static void           priority_q_init( void );
@@ -132,7 +111,7 @@ static inline int     __task_mutex_hold_list_priority_get ( struct rtk_tcb *ptcb
 static void           __task_pend_internal( struct rtk_tcb *task, unsigned int tick,
                                             int ( *task_wakeup)( struct rtk_tcb*, void * ),
                                             void *arg );
-static void           __release_one_mutex( struct rtk_mutex *semid );
+static void           __release_one_mutex( struct rtk_mutex *semid, int err_code );
 static int            __mutex_raise_owner_priority( struct rtk_mutex *semid, int priority );
 static int            __mutex_add_pending_task_trig( struct rtk_semaphore *semid, struct rtk_tcb *ptcb );
 #endif
@@ -276,6 +255,8 @@ void task_delay( int tick )
     arch_interrupt_enable(old);
 }
 
+
+
 static void __task_pend_internal( struct rtk_tcb *task, unsigned int tick,
                                   int ( *task_wakeup)( struct rtk_tcb*, void * ),
                                   void *arg )
@@ -300,7 +281,9 @@ static void __task_pend_internal( struct rtk_tcb *task, unsigned int tick,
     /*
      *  since the task is wake up, must remove from timer.
      */
-    rtk_tick_down_counter_remove( &task->tick_node );
+    task->status = TASK_READY;
+    __task_detach_pending_sem( task );
+    __task_detach_delay_counter( task );
 }
 
 static
@@ -832,7 +815,7 @@ int mutex_unlock( struct rtk_mutex *semid )
         return 0;
     }
     
-    __release_one_mutex( semid );
+    __release_one_mutex( semid, 0 );
     __restore_current_task_priority( semid );
     schedule_internel();
     
@@ -917,9 +900,9 @@ again:
 /** @} */
 #if CONFIG_MUTEX_EN
 static
-void __release_one_mutex( struct rtk_mutex *semid )
+void __release_one_mutex( struct rtk_mutex *semid, int error_code )
 {
-    __sem_wakeup_penders( (struct rtk_semaphore*)semid, 0, 1 );
+    __sem_wakeup_penders( (struct rtk_semaphore*)semid, error_code, 1 );
     __mutex_owner_set( semid, NULL );
 }
 #endif /* CONFIG_MUTEX_EN */
@@ -954,9 +937,8 @@ void __sem_add_pending_task( struct rtk_semaphore *semid, struct rtk_tcb *task )
 }
 
 static
-void __sem_remove_pending_task( struct rtk_semaphore *semid, struct rtk_tcb *task )
+void __task_detach_pending_sem( struct rtk_tcb *task )
 {
-    ( void )semid;
     list_del_init( &task->sem_node );
     task->psem_list = NULL;
 }
@@ -966,7 +948,7 @@ int __sem_resort_pend_list_trig( struct rtk_semaphore *semid, struct rtk_tcb *pt
 {
     int pri;
 
-    __sem_remove_pending_task( semid, ptcb );
+    __task_detach_pending_sem( ptcb );
     pri = __sem_pend_list_priority_get(semid);
     __sem_add_pending_task( semid, ptcb );
     return pri > __sem_pend_list_priority_get(semid);
@@ -983,13 +965,16 @@ int __sem_wakeup_penders( struct rtk_semaphore *semid, int err, int count )
     n = 0;
     list_for_each_safe( p, save, &semid->pending_tasks ) {
         ptcbwakeup = PEND_NODE_TO_PTCB( p );
-        if ( err ) {
-            /* remove timer only error. Otherwise */
+        /*
+         *  some one notice us error ocurse with sem, we must detach
+         *  task from sem.
+         */
+        if ( err ) {                    /*!  really wake up the task */
+            __task_detach_pending_sem( ptcbwakeup );
             rtk_tick_down_counter_remove( &ptcbwakeup->tick_node );
+            ptcbwakeup->status    = TASK_READY;
         }
-        __sem_remove_pending_task( semid, ptcbwakeup );
         READY_Q_PUT( ptcbwakeup, ptcbwakeup->current_priority );
-        ptcbwakeup->status    = TASK_READY;
         ptcbwakeup->err       = err;
         if ( ++n == count ) {
             break;
@@ -1208,15 +1193,15 @@ done:
 
 /** @} */
 
-void task_init(struct rtk_tcb      *ptcb, 
-               const char *name,
-               int         priority, /* priority of new task */
-               int         option, /* task option word */
-               char *      stack_low,
-               char *      stack_high,
-               void       *pfunc, /* entry point of new task */
-               void       *arg1, /* 1st of 10 req'd args to pass to entryPt */
-               void       *arg2)
+struct rtk_tcb *task_init(struct rtk_tcb *ptcb, 
+                          const char     *name,
+                          int             priority, /* priority of new task */
+                          int             option, /* task option word */
+                          char *          stack_low,
+                          char *          stack_high,
+                          void           *pfunc, /* entry point of new task */
+                          void           *arg1, /* 1st of 10 req'd args to pass to entryPt */
+                          void           *arg2)
 {
 #if CONFIG_MUTEX_EN
     ptcb->priority         = priority;
@@ -1241,6 +1226,7 @@ void task_init(struct rtk_tcb      *ptcb,
 #endif
     INIT_LIST_HEAD( &ptcb->task_list_node );
     rtk_tick_down_counter_set_func( &ptcb->tick_node, task_delay_timeout );
+    return ptcb;
 }
 
 int task_startup( struct rtk_tcb *ptcb )
@@ -1321,7 +1307,7 @@ int task_terminate( struct rtk_tcb *ptcb )
     list_for_each_safe(p, save, &ptcb->mutex_holded_head){
         struct rtk_mutex *psemid;
         psemid = SEM_MEMBER_PTR_TO_SEMID( p );
-        __release_one_mutex( psemid );
+        __release_one_mutex( psemid, ENXIO );
     }
 #endif
 
@@ -1390,7 +1376,7 @@ void task_exit( void )
     list_for_each_safe(p, save, &ptcb_current->mutex_holded_head){
         struct rtk_mutex *psemid;
         psemid = SEM_MEMBER_PTR_TO_SEMID( p );
-        __release_one_mutex( psemid );
+        __release_one_mutex( psemid, ENXIO );
     }
 #endif
     ptcb = PRIO_NODE_TO_PTCB( g_readyq.phighest_node );

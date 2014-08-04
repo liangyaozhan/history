@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-08-03 19:12:57, by lyzh>
+/* Last modified Time-stamp: <2014-08-04 12:32:15, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -283,16 +283,16 @@ void rtk_init( void );
  *  So you must use function task_startup() to start a initialized task.
  * @sa task_starup();
  */
-void task_init(struct rtk_tcb      *ptcb,
-               const char *name,
-               int         priority, /* priority of new task */
-               int         option, /* task option word */
-               char *      stack_low,
-               char *      stack_high,
-               void       *pfunc, /* entry point of new task */
-               void       *arg1, /* 1st of 10 req'd args to pass to entryPt */
-               void       *arg2);
-
+struct rtk_tcb *task_init(struct rtk_tcb *ptcb,
+                          const char     *name,
+                          int             priority, /* priority of new task */
+                          int             option, /* task option word */
+                          char *          stack_low,
+                          char *          stack_high,
+                          void           *pfunc, /* entry point of new task */
+                          void           *arg1, /* 1st of 10 req'd args to pass to entryPt */
+                          void           *arg2);
+    
 /**
  *  @brief task start up.
  *
