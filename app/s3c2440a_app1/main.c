@@ -208,6 +208,8 @@ int main()
     static TASK_INFO_DECL( info_led,   512*16);
     static TASK_INFO_DECL( info_led1,   512*16);
     static TASK_INFO_DECL( info_root,  1024*4);
+
+    
     
     arch_interrupt_disable();
 

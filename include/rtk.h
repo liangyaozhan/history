@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-08-01 19:23:08, by lyzh>
+/* Last modified Time-stamp: <2014-08-03 19:12:57, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -22,8 +22,15 @@
 #ifndef __RTK_H
 #define __RTK_H
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif                                                                  /* __cplusplus                  */
+
+
 #include <stdint.h>
 #include "list.h"
+
 #include "rtk_config.h"
 
 /**
@@ -116,9 +123,9 @@ struct rtk_semaphore
  */
 struct rtk_mutex
 {
-    struct rtk_semaphore    s;
-    struct list_head        sem_member_node;        /*!< only used when it is mutex          */
-    int                     mutex_recurse_count;    /*!< only used when it is mutex          */
+    struct rtk_semaphore s;
+    struct list_head     sem_member_node; /*!< only used when it is mutex          */
+    int                  mutex_recurse_count; /*!< only used when it is mutex          */
 };
 
 
@@ -787,6 +794,13 @@ extern struct rtk_tcb *rtk_self(void);
 /**
  *  @}
  */
+
+    
+
+#ifdef __cplusplus
+}
+#endif                                                                  /*  __cplusplus                 */
+
 
 #endif
 
