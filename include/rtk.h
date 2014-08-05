@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-08-04 12:56:13, by lyzh>
+/* Last modified Time-stamp: <2014-08-05 13:01:08, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -48,14 +48,14 @@ extern "C" {
  *  @brief soft timer structure definition
  *
  *  this is a link list watchdog like soft timer implementation.
- *  The list is sorted at insertion time by uiTick.
+ *  The list is sorted at insertion time by 'tick'.
  *  The first element's uiTick is decreased at each tick anounce in the link list.
  */
 struct  rtk_tick
 {
-    struct list_head node;                          /*!< node to the link list   */
-    unsigned int     tick;                        /*!< tick count              */
-    void (*timeout_callback)( struct rtk_tick *);    /*!< timeout callback function        */
+    struct list_head node;                        /*!< node to the link list     */
+    unsigned int     tick;                        /*!< tick count                */
+    void (*timeout_callback)( struct rtk_tick *); /*!< timeout callback function */
 };
 
 
@@ -80,26 +80,26 @@ struct rtk_private_priority_q_node
  */
 struct rtk_tcb
 {
-    void                               *sp; /*!< stack pointor, will keep it the first one */
-    const char                         *name; /*!< task's name            */
-    char                               *stack_low; /*!< stack low pointor      */
-    char                               *stack_high; /*!< stack high pointor     */
-    struct rtk_private_priority_q_node  prio_node; /*!< node in priority Q     */
-    struct rtk_tick                     tick_node; /*!< node in softtimer Q    */
-    struct list_head                    sem_node; /*!< node in pending Q      */
-    struct list_head                   *psem_list; /*!< pend node if any       */
+    void                               *sp;                /*!< stack pointor,        */
+    const char                         *name;              /*!< task's name           */
+    char                               *stack_low;         /*!< stack low pointor     */
+    char                               *stack_high;        /*!< stack high pointor    */
+    struct rtk_private_priority_q_node  prio_node;         /*!< node in priority Q    */
+    struct rtk_tick                     tick_node;         /*!< node in softtimer Q   */
+    struct list_head                    sem_node;          /*!< node in pending Q     */
+    struct list_head                   *pending_resource;  /*!< pend node if any      */
 #if CONFIG_MUTEX_EN
-    struct list_head                    mutex_holded_head; /*!< remember all mutex     */
-    int                                 priority; /*!< normal priority        */
+    struct list_head                    mutex_holded_head; /*!< remember all mutex    */
+    int                                 priority;          /*!< normal priority       */
 #endif
-    struct list_head                    task_list_node; /*!< node in task list      */
-    int                                 option; /*!< for the further        */
-    int                                 current_priority; /*!< running priority       */
-    int                                 err; /*!< errno used internal    */
+    struct list_head                    task_list_node;    /*!< node in task list     */
+    int                                 option;            /*!< for the further       */
+    int                                 current_priority;  /*!< running priority      */
+    int                                 err;               /*!< errno used internal   */
 #if CONFIG_TASK_TERMINATE_EN
-    int                                 safe_count; /*!< prevent task deletion  */
+    int                                 safe_count;        /*!< prevent task deletion */
 #endif
-    int                                 status; /*!< task status            */
+    int                                 status;            /*!< task status           */
 };
 
 
@@ -678,8 +678,8 @@ int mutex_terminate( struct rtk_mutex *mutex );
  *  \param[in]  buff        buffer pointer.
  *  \param[in]  buffer_size buffer size.
  *  \param[in]  unit_size   element size.
- *  \return     0           always successfully.
- *  \return     -EINVAL     Invalid argument.
+ *  \return     pmsgq       successfully.
+ *  \return     NULL        Invalid argument.
  *  \attention  parameter is not checked. You should check it by yourself.
  *
  *  @par example  
@@ -696,7 +696,7 @@ int mutex_terminate( struct rtk_mutex *mutex );
  *      }
  *  @endcode
  */
-int msgq_init( struct rtk_msgq *pmsgq, void *buff, int buffer_size, int unit_size );
+struct rtk_msgq *msgq_init( struct rtk_msgq *pmsgq, void *buff, int buffer_size, int unit_size );
 
 /**
  *  \brief make a msgq invalidate.
@@ -773,6 +773,13 @@ extern void schedule(void);
 #define EXIT_INT_CONTEXT()      exit_int_context()
 
 
+#if CONFIG_TICK_DOWN_COUNTER_EN>0
+void rtk_tick_down_counter_init(struct rtk_tick *_this);
+int rtk_tick_down_counter_set_func( struct rtk_tick *_this, void (*func)(struct rtk_tick *) );
+int rtk_tick_down_counter_add( struct rtk_tick *_this, unsigned int tick );
+void rtk_tick_down_counter_remove ( struct rtk_tick *_this );
+void rtk_tick_down_counter_set( struct rtk_tick *_this, unsigned int tick );
+#endif
 /**
  * @brief task list head
  *

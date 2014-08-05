@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-08-04 12:56:27, by lyzh>
+/* Last modified Time-stamp: <2014-08-05 12:55:46, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -33,27 +33,27 @@
 #include "err.h"
 
 
-#define PRIO_NODE_TO_PTCB(pNode)        list_entry(pNode, struct rtk_tcb, prio_node)
-#define TICK_NODE_TO_PTCB(pNode)        list_entry(pNode, struct rtk_tcb, tick_node)
-#define PEND_NODE_TO_PTCB(pNode)        list_entry(pNode, struct rtk_tcb, sem_node)
+
+#define PRIO_NODE_TO_PTCB(pdn)        list_entry(pdn, struct rtk_tcb, prio_node)
+#define TICK_NODE_TO_PTCB(pdn)        list_entry(pdn, struct rtk_tcb, tick_node)
+#define PEND_NODE_TO_PTCB(pdn)        list_entry(pdn, struct rtk_tcb, sem_node)
 #define READY_Q_REMOVE( ptcb )          priority_q_remove( &(ptcb)->prio_node )
 #define READY_Q_PUT( ptcb, key)         priority_q_put(&(ptcb)->prio_node, key)
-#define DELAY_Q_PUT(ptcb, tick)         rtk_tick_down_counter_add( &(ptcb)->tick_node, tick )
 #define PLIST_PTR_TO_SEMID( ptr )       list_entry( (ptr), struct rtk_semaphore, pending_tasks )
 #define SEM_MEMBER_PTR_TO_SEMID( ptr )  list_entry( (ptr), struct rtk_mutex, sem_member_node )
-#define __task_detach_delay_counter(task) rtk_tick_down_counter_remove( &task->tick_node );
+#define __task_detach_delay_counter(task) __rtk_tick_down_counter_remove( &task->tick_node );
 
 #ifndef NULL
-#define NULL                       ((void*)0)
+#define NULL               ((void*)0)
 #endif
-#define LIST_HEAD_FIRST(l)      ((l)->next)
+#define LIST_HEAD_FIRST(l) ((l)->next)
 
 
 /**
  *  @brief optimize macro
  */
 #define likely(x)    __builtin_expect(!!(x), 1)  /*!< likely optimize macro      */
-#define unlikely(x)    __builtin_expect(!!(x), 0)  /*!< unlikely optimize macro    */
+#define unlikely(x)  __builtin_expect(!!(x), 0)  /*!< unlikely optimize macro    */
 
 #undef int_min
 #define int_min(a, b) ((a)>(b)?(b):(a))
@@ -92,17 +92,17 @@ extern int rtk_ffs( register unsigned int q );
 
 
 void *memcpy(void*,const void*,int);
-static inline void    __sem_add_pending_task( struct rtk_semaphore *semid, struct rtk_tcb *pendingtask );
+static inline void    __sem_add_pending_task( struct rtk_semaphore *semid, struct rtk_tcb *task );
 static inline void    __task_detach_pending_sem( struct rtk_tcb *task );
-static inline void    __sem_remove_pending_task( struct rtk_tcb *task );
 static inline int     __sem_pend_list_priority_get ( struct rtk_semaphore *semid );
-static void           task_delay_timeout( struct rtk_tick *pdn );
+static void           task_delay_timeout( struct rtk_tick *_this );
 static void           priority_q_init( void );
-static int            priority_q_put( pqn_t *pNode, int key );
-static int            priority_q_remove( pqn_t *pNode );
-static void           rtk_tick_down_counter_set_func( struct rtk_tick *pNode, void (*func)(struct rtk_tick *) );
-static void           rtk_tick_down_counter_add(struct rtk_tick *pdn, unsigned int tick);
-static void           rtk_tick_down_counter_remove ( struct rtk_tick *pdn );
+static int            priority_q_put( pqn_t *_this, int key );
+static int            priority_q_remove( pqn_t *_this );
+static void           __rtk_tick_down_counter_set_func( struct rtk_tick *_this, void (*func)(struct rtk_tick *) );
+static void           __rtk_tick_down_counter_init(struct rtk_tick *_this);
+static void           __rtk_tick_down_counter_add(struct rtk_tick *_this, unsigned int tick);
+static void           __rtk_tick_down_counter_remove ( struct rtk_tick *_this );
 void                  rtk_tick_down_counter_announce( void );
 #if CONFIG_MUTEX_EN
 static void           __restore_current_task_priority( struct rtk_mutex *semid );
@@ -197,42 +197,42 @@ pqn_t *priority_q_highest_get( priority_q_bitmap_head_t *pqHead )
     return list_entry( LIST_HEAD_FIRST( &pqHead->tasks[ index ] ), pqn_t, node);
 }
 
-int priority_q_put( pqn_t *pNode, int key )
+int priority_q_put( pqn_t *_this, int key )
 {
     register priority_q_bitmap_head_t *pqHead = &g_readyq;
 
     /* cannot put more than once time, but, if key not the same, we change it.  */
-    if ( unlikely(!list_empty(&pNode->node)) ) {
-        if ( likely(pNode->key == key) ) {
+    if ( unlikely(!list_empty(&_this->node)) ) {
+        if ( likely(_this->key == key) ) {
             return -1;
         } else {
-            priority_q_remove( pNode );
+            priority_q_remove( _this );
         }
     }
-    pNode->key = key;
+    _this->key = key;
     priority_q_bitmap_set( pqHead, key );
-    list_add_tail( &pNode->node, &pqHead->tasks[key] );
+    list_add_tail( &_this->node, &pqHead->tasks[key] );
 
     /*
      *  set high node
      */
     if ( unlikely(NULL == pqHead->phighest_node) || (key < pqHead->phighest_node->key) ) {
-        pqHead->phighest_node = pNode;
+        pqHead->phighest_node = _this;
     }
     return 0;
 }
 
-int priority_q_remove( pqn_t *pNode )
+int priority_q_remove( pqn_t *_this )
 {
     register priority_q_bitmap_head_t *pqHead = &g_readyq;
     int key;
     
-    key = pNode->key;
-    list_del_init( &pNode->node );
+    key = _this->key;
+    list_del_init( &_this->node );
     if ( list_empty( &pqHead->tasks[key] ) ) {
         priority_q_bitmap_clear( pqHead, key );
     }
-    if ( pqHead->phighest_node == pNode  ) {
+    if ( pqHead->phighest_node == _this  ) {
         pqHead->phighest_node = priority_q_highest_get( pqHead );
     }
     return 0;
@@ -248,7 +248,7 @@ void task_delay( int tick )
     READY_Q_REMOVE( ptcb_current );
     last = ptcb_current->err;
     ptcb_current->status = TASK_DELAY;
-    rtk_tick_down_counter_add( &ptcb_current->tick_node, tick );
+    __rtk_tick_down_counter_add( &ptcb_current->tick_node, tick );
     schedule_internel();
     ptcb_current->err = last;
     ptcb_current->status = TASK_READY;
@@ -264,7 +264,7 @@ static void __task_pend_internal( struct rtk_tcb *task, unsigned int tick,
     int status = 0;
     if ( tick != WAIT_FOREVER ) {
         status = TASK_DELAY;
-        rtk_tick_down_counter_add( &task->tick_node, tick );
+        __rtk_tick_down_counter_add( &task->tick_node, tick );
     }
 
     task->err    = 0;
@@ -287,11 +287,11 @@ static void __task_pend_internal( struct rtk_tcb *task, unsigned int tick,
 }
 
 static
-void task_delay_timeout( struct rtk_tick *pNode )
+void task_delay_timeout( struct rtk_tick *_this )
 {
     struct rtk_tcb *p;
     
-    p = TICK_NODE_TO_PTCB( pNode );
+    p = TICK_NODE_TO_PTCB( _this );
     p->err = ETIME;
     READY_Q_PUT( p, p->current_priority );
     p->status = TASK_READY;
@@ -316,7 +316,13 @@ void rtk_startup( void )
     arch_context_switch_to(&ptcb->sp);
 }
 
-void rtk_tick_down_counter_add( struct rtk_tick *pdn, unsigned int tick )
+
+static void __rtk_tick_down_counter_init(struct rtk_tick *_this)
+{
+    INIT_LIST_HEAD( &_this->node );
+}
+
+void __rtk_tick_down_counter_add( struct rtk_tick *_this, unsigned int tick )
 {
     struct list_head *p;
     struct rtk_tick  *p_tick = 0;
@@ -329,32 +335,32 @@ void rtk_tick_down_counter_add( struct rtk_tick *pdn, unsigned int tick )
             break;
         }
     }
-    pdn->tick = tick;
+    _this->tick = tick;
 
-    list_add_tail( &pdn->node, p);
+    list_add_tail( &_this->node, p);
     if (p != &g_softtime_head ) {
         p_tick->tick -= tick;
     }
 }
 
-void rtk_tick_down_counter_remove ( struct rtk_tick *pdn )
+void __rtk_tick_down_counter_remove ( struct rtk_tick *_this )
 {
     struct rtk_tick *p_tick;
 
-    if ( list_empty(&pdn->node) ) {
+    if ( list_empty(&_this->node) ) {
         return ;
     }
 
-    if ( LIST_HEAD_FIRST( &pdn->node ) != &g_softtime_head ) {
-        p_tick = list_entry( LIST_HEAD_FIRST( &pdn->node ), struct rtk_tick, node);
-        p_tick->tick += pdn->tick;
+    if ( LIST_HEAD_FIRST( &_this->node ) != &g_softtime_head ) {
+        p_tick = list_entry( LIST_HEAD_FIRST( &_this->node ), struct rtk_tick, node);
+        p_tick->tick += _this->tick;
     }
-    list_del_init( &pdn->node );
+    list_del_init( &_this->node );
 }
 
-void rtk_tick_down_counter_set_func( struct rtk_tick *pNode, void (*func)(struct rtk_tick *) )
+void __rtk_tick_down_counter_set_func( struct rtk_tick *_this, void (*func)(struct rtk_tick *) )
 {
-    pNode->timeout_callback = func;
+    _this->timeout_callback = func;
 }
 
 /**
@@ -373,25 +379,25 @@ void rtk_tick_down_counter_announce( void )
     if ( !list_empty( &g_softtime_head ) ) {
         struct list_head *p;
         struct list_head *pNext;
-        struct rtk_tick *pNode;
+        struct rtk_tick *_this;
         
         p = LIST_HEAD_FIRST( &g_softtime_head );
-        pNode = list_entry(p, struct rtk_tick, node);
+        _this = list_entry(p, struct rtk_tick, node);
 
         /*
          * in case of 'task_delay(0)'
          */
-        if ( likely(pNode->tick) ) {
-            pNode->tick--;
+        if ( likely(_this->tick) ) {
+            _this->tick--;
         }
         
         for (; !list_empty(&g_softtime_head); ) {
             pNext = LIST_HEAD_FIRST(p);
-            pNode = list_entry(p, struct rtk_tick, node);
-            if ( pNode->tick == 0) {
-                list_del_init( &pNode->node );
-                if ( pNode->timeout_callback ) {
-                    (*pNode->timeout_callback)( pNode );
+            _this = list_entry(p, struct rtk_tick, node);
+            if ( _this->tick == 0) {
+                list_del_init( &_this->node );
+                if ( _this->timeout_callback ) {
+                    (*_this->timeout_callback)( _this );
                 }
             } else {
                 goto DoneOK;
@@ -856,7 +862,7 @@ static int __mutex_dead_lock_detected( struct rtk_mutex *semid )
     powner = s->s.u.owner;
 again:
     if ( powner->status & TASK_PENDING ) {
-        s = (struct rtk_mutex *)PLIST_PTR_TO_SEMID( powner->psem_list );
+        s = (struct rtk_mutex *)PLIST_PTR_TO_SEMID( powner->pending_resource );
         if ( s->s.type == SEM_TYPE_MUTEX ) {
             powner = s->s.u.owner;
             if ( powner == ptcb_current  )
@@ -880,7 +886,7 @@ void __mutex_dead_lock_show( struct rtk_mutex *mutex )
 again:
     kprintf(", taken by %s", powner->name );
     if ( powner->status & TASK_PENDING ) {
-        s = (struct rtk_mutex *)PLIST_PTR_TO_SEMID( powner->psem_list );
+        s = (struct rtk_mutex *)PLIST_PTR_TO_SEMID( powner->pending_resource );
         kprintf(", and pending on 0x%08X ", s );
         if ( s->s.type == SEM_TYPE_MUTEX ) {
             powner = s->s.u.owner;
@@ -933,14 +939,14 @@ void __sem_add_pending_task( struct rtk_semaphore *semid, struct rtk_tcb *task )
     }
     
     list_add_tail( &task->sem_node, p );
-    task->psem_list = &semid->pending_tasks;
+    task->pending_resource = &semid->pending_tasks;
 }
 
 static
 void __task_detach_pending_sem( struct rtk_tcb *task )
 {
     list_del_init( &task->sem_node );
-    task->psem_list = NULL;
+    task->pending_resource = NULL;
 }
 
 static
@@ -971,7 +977,7 @@ int __sem_wakeup_penders( struct rtk_semaphore *semid, int err, int count )
          */
         if ( err ) {                    /*!  really wake up the task */
             __task_detach_pending_sem( ptcbwakeup );
-            rtk_tick_down_counter_remove( &ptcbwakeup->tick_node );
+            __rtk_tick_down_counter_remove( &ptcbwakeup->tick_node );
             ptcbwakeup->status    = TASK_READY;
         }
         READY_Q_PUT( ptcbwakeup, ptcbwakeup->current_priority );
@@ -1060,7 +1066,7 @@ again:
                 READY_Q_REMOVE( powner );
                 READY_Q_PUT( powner, priority );
             } else if ( powner->status & TASK_PENDING ) {
-                semid   = (struct rtk_mutex*)PLIST_PTR_TO_SEMID( powner->psem_list );
+                semid   = (struct rtk_mutex*)PLIST_PTR_TO_SEMID( powner->pending_resource );
                 if ( __sem_resort_pend_list_trig( (struct rtk_semaphore*)semid, powner ) &&
                      (semid->s.type == SEM_TYPE_MUTEX) && semid->s.u.owner ) {
                     /*
@@ -1164,7 +1170,7 @@ int task_priority_set( struct rtk_tcb *ptcb, unsigned int priority )
     if ( ptcb->status & TASK_PENDING ) {
         struct rtk_semaphore *semid;
         int          trig;
-        semid   = PLIST_PTR_TO_SEMID( ptcb->psem_list );
+        semid   = PLIST_PTR_TO_SEMID( ptcb->pending_resource );
         trig = __sem_resort_pend_list_trig( (struct rtk_semaphore*)semid, ptcb );
 #if CONFIG_MUTEX_EN
         if ( trig && semid->type == SEM_TYPE_MUTEX ) {
@@ -1203,29 +1209,29 @@ struct rtk_tcb *task_init(struct rtk_tcb *ptcb,
                           void           *arg1, /* 1st of 10 req'd args to pass to entryPt */
                           void           *arg2)
 {
-#if CONFIG_MUTEX_EN
-    ptcb->priority         = priority;
-#endif
     ptcb->current_priority = priority;
     ptcb->status           = TASK_PREPARED;
-    ptcb->psem_list        = (void*)0;
+    ptcb->pending_resource = (void*)0;
     ptcb->option           = option;
     ptcb->stack_low        = stack_low;
     ptcb->stack_high       = stack_high;
+    ptcb->name             = name;
+#if CONFIG_MUTEX_EN
+    ptcb->priority         = priority;
+#endif
 #if CONFIG_TASK_TERMINATE_EN
     ptcb->safe_count       = 0;
 #endif
-    ptcb->name = name;
 
     ptcb->sp = arch_stack_init( pfunc, arg1, arg2, stack_low, stack_high, task_exit );
     INIT_LIST_HEAD( &ptcb->prio_node.node );
-    INIT_LIST_HEAD( &ptcb->tick_node.node );
     INIT_LIST_HEAD( &ptcb->sem_node );
 #if CONFIG_MUTEX_EN
     INIT_LIST_HEAD( &ptcb->mutex_holded_head );
 #endif
     INIT_LIST_HEAD( &ptcb->task_list_node );
-    rtk_tick_down_counter_set_func( &ptcb->tick_node, task_delay_timeout );
+    __rtk_tick_down_counter_init( &ptcb->tick_node );
+    __rtk_tick_down_counter_set_func( &ptcb->tick_node, task_delay_timeout );
     return ptcb;
 }
 
@@ -1298,7 +1304,7 @@ int task_terminate( struct rtk_tcb *ptcb )
      *  remove delay node
      */
     if ( !list_empty( &(ptcb->tick_node.node) )) {
-        rtk_tick_down_counter_remove( &ptcb->tick_node );
+        __rtk_tick_down_counter_remove( &ptcb->tick_node );
     }
 #if CONFIG_MUTEX_EN
     /*
@@ -1441,18 +1447,18 @@ unsigned int tick_get( void )
  *  \param[in]  buff        buffer pointer.
  *  \param[in]  buffer_size buffer size.
  *  \param[in]  unit_size   element size.
- *  \return     0           always successfully.
- *  \return     -EINVAL     Invalid argument.
+ *  \return     pmsgq       successfully.
+ *  \return     NULL        Invalid argument.
  *  \attention  parameter is not checked. You should check it by yourself.
  */
-int msgq_init( struct rtk_msgq *pmsgq, void *buff, int buffer_size, int unit_size )
+struct rtk_msgq *msgq_init( struct rtk_msgq *pmsgq, void *buff, int buffer_size, int unit_size )
 {
     int     count;
 
     count = buffer_size / unit_size;
     
     if ( buffer_size == 0 || count == 0 ) {
-        return -EINVAL;
+        return NULL;
     }
 
     pmsgq->buff_size = buffer_size;
@@ -1465,7 +1471,7 @@ int msgq_init( struct rtk_msgq *pmsgq, void *buff, int buffer_size, int unit_siz
     semc_init( &pmsgq->sem_rd,  0 );
     semc_init( &pmsgq->sem_wr,  count );
 
-    return 0;
+    return pmsgq;
 }
 
 /**
@@ -1529,9 +1535,9 @@ int msgq_receive( struct rtk_msgq *pmsgq, void *buff, int buff_size, int tick )
         memcpy( buff, pmsgq->buff + pmsgq->unit_size*rd, pmsgq->unit_size );
     }
     
+    semc_give( &pmsgq->sem_wr );
     arch_interrupt_enable(old);
 
-    semc_give( &pmsgq->sem_wr );
     return 0;
 }
 /**
@@ -1581,9 +1587,9 @@ int msgq_send( struct rtk_msgq *pmsgq, const void *buff, int size, int tick )
         memcpy( pmsgq->buff + pmsgq->unit_size*wr, buff, int_min(pmsgq->unit_size, size) );
     }
     
+    semc_give( &pmsgq->sem_rd );
     arch_interrupt_enable(old);
 
-    semc_give( &pmsgq->sem_rd );
     return 0;
 }
 
@@ -1609,4 +1615,56 @@ int msgq_clear( struct rtk_msgq *pmsgq )
     arch_interrupt_enable(old);
     return 0;
 }
+#endif
+
+#if CONFIG_TICK_DOWN_COUNTER_EN>0
+
+void rtk_tick_down_counter_init(struct rtk_tick *_this)
+{
+    __rtk_tick_down_counter_init(_this);
+}
+    
+int rtk_tick_down_counter_set_func( struct rtk_tick *_this, void (*func)(struct rtk_tick *) )
+{
+    int old;
+    old = arch_interrupt_disable();
+    __rtk_tick_down_counter_set_func(_this, func);
+    arch_interrupt_enable(old);
+    return 0;
+}
+
+int rtk_tick_down_counter_add( struct rtk_tick *_this, unsigned int tick )
+{
+    int old;
+    int ok = 0;
+    
+    old = arch_interrupt_disable();
+    if ( list_empty(&_this->node) )
+    {
+        __rtk_tick_down_counter_add( _this, tick );
+    } else {
+        ok = -EEXIST;
+    }
+    arch_interrupt_enable( old );
+    return ok;
+}
+
+void rtk_tick_down_counter_remove ( struct rtk_tick *_this )
+{
+    int old;
+    old = arch_interrupt_disable();
+    __rtk_tick_down_counter_remove( _this );
+    arch_interrupt_enable( old );
+}
+
+void rtk_tick_down_counter_set( struct rtk_tick *_this, unsigned int tick )
+{
+    int old;
+    
+    old = arch_interrupt_disable();
+    __rtk_tick_down_counter_remove( _this );
+    __rtk_tick_down_counter_add( _this, tick );
+    arch_interrupt_enable( old );
+}
+
 #endif

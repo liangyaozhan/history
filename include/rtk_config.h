@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2012-11-06 23:48:14 Tuesday by lyzh>
+/* Last modified Time-stamp: <2014-08-05 12:37:11, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -45,6 +45,7 @@
 #define CONFIG_TASK_TERMINATE_EN       1
 #define CONFIG_DEAD_LOCK_DETECT_EN     1
 #define CONFIG_DEAD_LOCK_SHOW_EN       1
+#define CONFIG_TICK_DOWN_COUNTER_EN    1
 /** @} */
 
 /**

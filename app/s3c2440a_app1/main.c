@@ -135,6 +135,28 @@ static void led_task( void *pa, void *pb)
         /* *(volatile int *)-1 = 0; */
     }
 }
+
+struct timer_obj
+{
+    struct rtk_tick base;
+    char *name;
+    int period;
+};
+
+static void timer_callback( struct timer_obj *_this )
+{
+    kprintf(
+        "\n***********************************************\n"
+        "\n***********************************************\n"
+        "\n**************** timer callback ***************\n"
+        "\n***************** 0x%08X ******************\n"
+        "\n %s \n"
+        "\n***********************************************\n",
+        _this,_this->name
+        );
+    rtk_tick_down_counter_add( &_this->base, _this->period );
+}
+
 int rtk_sprintf( char *buff, const char* str, ... );
 void * fb_open( void );
 void *fb_back_get( void );void fb_flip( void );
@@ -151,12 +173,20 @@ void main_task( void *pa, void *pb)
     int x;
     int y;
     unsigned short color;
-    
+    struct timer_obj timer0 = {
+        {},
+        "This is named timer0",
+        100
+    };
+
+    rtk_tick_down_counter_init( &timer0 );
+    rtk_tick_down_counter_set_func( &timer0, timer_callback );
+    rtk_tick_down_counter_add( &timer0, timer0.period );
     bsp_init();
     system_heap_init( &__sys_heap_start__, &__sys_heap_end__ );
 
     /* os_clk_init(); */
-    kprintf("sizeof tcb=%d\n", sizeof(struct rtk_tcb));
+    kprintf("\r\nsizeof tcb=%d\n", sizeof(struct rtk_tcb));
 
     for (i=0; i<sizeof(mutexs)/sizeof(mutexs[0]); i++) {
         mutex_init( &mutexs[i] );
