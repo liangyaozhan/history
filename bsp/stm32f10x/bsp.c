@@ -28,6 +28,6 @@ void SysTick_Handler(void)
 void assert_failed(uint8_t* file, uint32_t line)
 {
     kprintf ("assert_failed at %s:%d\n", file, line );
-    ptcb_current->safe_count = 0;
-    task_terminate( ptcb_current );
+    task_current->safe_count = 0;
+    task_terminate( task_current );
 }

@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-08-05 12:55:46, by lyzh>
+/* Last modified Time-stamp: <2014-08-06 08:19:35, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -34,11 +34,11 @@
 
 
 
-#define PRIO_NODE_TO_PTCB(pdn)        list_entry(pdn, struct rtk_tcb, prio_node)
-#define TICK_NODE_TO_PTCB(pdn)        list_entry(pdn, struct rtk_tcb, tick_node)
-#define PEND_NODE_TO_PTCB(pdn)        list_entry(pdn, struct rtk_tcb, sem_node)
-#define READY_Q_REMOVE( ptcb )          priority_q_remove( &(ptcb)->prio_node )
-#define READY_Q_PUT( ptcb, key)         priority_q_put(&(ptcb)->prio_node, key)
+#define PRIO_NODE_TO_PTCB(pdn)        list_entry(pdn, struct rtk_task, prio_node)
+#define TICK_NODE_TO_PTCB(pdn)        list_entry(pdn, struct rtk_task, tick_node)
+#define PEND_NODE_TO_PTCB(pdn)        list_entry(pdn, struct rtk_task, sem_node)
+#define READY_Q_REMOVE( task )          priority_q_remove( &(task)->prio_node )
+#define READY_Q_PUT( task, key)         priority_q_put(&(task)->prio_node, key)
 #define PLIST_PTR_TO_SEMID( ptr )       list_entry( (ptr), struct rtk_semaphore, pending_tasks )
 #define SEM_MEMBER_PTR_TO_SEMID( ptr )  list_entry( (ptr), struct rtk_mutex, sem_member_node )
 #define __task_detach_delay_counter(task) __rtk_tick_down_counter_remove( &task->tick_node );
@@ -81,7 +81,7 @@ typedef struct __priority_q_bitmap_head priority_q_bitmap_head_t;
 static priority_q_bitmap_head_t  g_readyq;
 static struct list_head          g_softtime_head;
 volatile unsigned long           g_systick;
-static struct rtk_tcb           *rtk_ptcb_current;
+static struct rtk_task           *rtk_task_current;
 int                              rtk_is_int_context;
 struct list_head                 g_systerm_tasks_head;
 
@@ -92,30 +92,30 @@ extern int rtk_ffs( register unsigned int q );
 
 
 void *memcpy(void*,const void*,int);
-static inline void    __sem_add_pending_task( struct rtk_semaphore *semid, struct rtk_tcb *task );
-static inline void    __task_detach_pending_sem( struct rtk_tcb *task );
+static inline void    __sem_add_pending_task( struct rtk_semaphore *semid, struct rtk_task *task );
+static inline void    __task_detach_pending_sem( struct rtk_task *task );
 static inline int     __sem_pend_list_priority_get ( struct rtk_semaphore *semid );
 static void           task_delay_timeout( struct rtk_tick *_this );
 static void           priority_q_init( void );
 static int            priority_q_put( pqn_t *_this, int key );
 static int            priority_q_remove( pqn_t *_this );
-static void           __rtk_tick_down_counter_set_func( struct rtk_tick *_this, void (*func)(struct rtk_tick *) );
+static void           __rtk_tick_down_counter_set_func( struct rtk_tick *_this, void (*func)(void *), void *);
 static void           __rtk_tick_down_counter_init(struct rtk_tick *_this);
 static void           __rtk_tick_down_counter_add(struct rtk_tick *_this, unsigned int tick);
 static void           __rtk_tick_down_counter_remove ( struct rtk_tick *_this );
 void                  rtk_tick_down_counter_announce( void );
 #if CONFIG_MUTEX_EN
 static void           __restore_current_task_priority( struct rtk_mutex *semid );
-static int            __mutex_owner_set( struct rtk_mutex *semid, struct rtk_tcb *ptcbToAdd );
-static inline int     __task_mutex_hold_list_priority_get ( struct rtk_tcb *ptcb );
-static void           __task_pend_internal( struct rtk_tcb *task, unsigned int tick,
-                                            int ( *task_wakeup)( struct rtk_tcb*, void * ),
+static int            __mutex_owner_set( struct rtk_mutex *semid, struct rtk_task *taskToAdd );
+static inline int     __task_mutex_hold_list_priority_get ( struct rtk_task *task );
+static void           __task_pend_internal( struct rtk_task *task, unsigned int tick,
+                                            int ( *task_wakeup)( struct rtk_task*, void * ),
                                             void *arg );
 static void           __release_one_mutex( struct rtk_mutex *semid, int err_code );
 static int            __mutex_raise_owner_priority( struct rtk_mutex *semid, int priority );
-static int            __mutex_add_pending_task_trig( struct rtk_semaphore *semid, struct rtk_tcb *ptcb );
+static int            __mutex_add_pending_task_trig( struct rtk_semaphore *semid, struct rtk_task *task );
 #endif
-static struct rtk_tcb*highest_tcb_get( void );
+static struct rtk_task*highest_tcb_get( void );
 extern void           arch_context_switch(void **fromsp, void **tosp);
 extern void           arch_context_switch_interrupt(void **fromsp, void **tosp);
 void                  arch_context_switch_to(void **sp);
@@ -132,14 +132,14 @@ void                  __mutex_dead_lock_show( struct rtk_mutex *mutex );
 static void           task_exit( void );
 
 
-struct rtk_tcb *rtk_self(void)
+struct rtk_task *task_self(void)
 {
-    return rtk_ptcb_current;
+    return rtk_task_current;
 }
 
-inline static struct rtk_tcb *rtk_set_self(struct rtk_tcb *p)
+inline static struct rtk_task *rtk_set_self(struct rtk_task *p)
 {
-    rtk_ptcb_current = p;
+    rtk_task_current = p;
     return p;
 }
 
@@ -242,23 +242,23 @@ void task_delay( int tick )
 {
     int old;
     int last;
-    struct rtk_tcb *ptcb_current = rtk_self();
+    struct rtk_task *task_current = task_self();
 
     old = arch_interrupt_disable();
-    READY_Q_REMOVE( ptcb_current );
-    last = ptcb_current->err;
-    ptcb_current->status = TASK_DELAY;
-    __rtk_tick_down_counter_add( &ptcb_current->tick_node, tick );
+    READY_Q_REMOVE( task_current );
+    last = task_current->err;
+    task_current->status = TASK_DELAY;
+    __rtk_tick_down_counter_add( &task_current->tick_node, tick );
     schedule_internel();
-    ptcb_current->err = last;
-    ptcb_current->status = TASK_READY;
+    task_current->err = last;
+    task_current->status = TASK_READY;
     arch_interrupt_enable(old);
 }
 
 
 
-static void __task_pend_internal( struct rtk_tcb *task, unsigned int tick,
-                                  int ( *task_wakeup)( struct rtk_tcb*, void * ),
+static void __task_pend_internal( struct rtk_task *task, unsigned int tick,
+                                  int ( *task_wakeup)( struct rtk_task*, void * ),
                                   void *arg )
 {
     int status = 0;
@@ -289,7 +289,7 @@ static void __task_pend_internal( struct rtk_tcb *task, unsigned int tick,
 static
 void task_delay_timeout( struct rtk_tick *_this )
 {
-    struct rtk_tcb *p;
+    struct rtk_task *p;
     
     p = TICK_NODE_TO_PTCB( _this );
     p->err = ETIME;
@@ -298,22 +298,22 @@ void task_delay_timeout( struct rtk_tick *_this )
 }
 
 static
-struct rtk_tcb *highest_tcb_get( void )
+struct rtk_task *highest_tcb_get( void )
 {
-    struct rtk_tcb *ptcb_current = rtk_self();
+    struct rtk_task *task_current = task_self();
 
-    if ( ptcb_current->status == TASK_READY ) {
-        READY_Q_REMOVE( ptcb_current );
-        READY_Q_PUT( ptcb_current, ptcb_current->current_priority );
+    if ( task_current->status == TASK_READY ) {
+        READY_Q_REMOVE( task_current );
+        READY_Q_PUT( task_current, task_current->current_priority );
     }
     return PRIO_NODE_TO_PTCB( g_readyq.phighest_node );
 }
 
 void rtk_startup( void )
 {
-    struct rtk_tcb *ptcb = PRIO_NODE_TO_PTCB( g_readyq.phighest_node );
-    rtk_set_self( ptcb );
-    arch_context_switch_to(&ptcb->sp);
+    struct rtk_task *task = PRIO_NODE_TO_PTCB( g_readyq.phighest_node );
+    rtk_set_self( task );
+    arch_context_switch_to(&task->sp);
 }
 
 
@@ -358,9 +358,10 @@ void __rtk_tick_down_counter_remove ( struct rtk_tick *_this )
     list_del_init( &_this->node );
 }
 
-void __rtk_tick_down_counter_set_func( struct rtk_tick *_this, void (*func)(struct rtk_tick *) )
+void __rtk_tick_down_counter_set_func( struct rtk_tick *_this, void (*func)(void*), void *arg )
 {
     _this->timeout_callback = func;
+    _this->arg              = arg;
 }
 
 /**
@@ -397,7 +398,7 @@ void rtk_tick_down_counter_announce( void )
             if ( _this->tick == 0) {
                 list_del_init( &_this->node );
                 if ( _this->timeout_callback ) {
-                    (*_this->timeout_callback)( _this );
+                    (*_this->timeout_callback)( _this->arg );
                 }
             } else {
                 goto DoneOK;
@@ -454,7 +455,7 @@ int semc_init( struct rtk_semaphore *semid, int InitCount )
     return 0;
 }
 
-static int __sem_task_wakeup( struct rtk_tcb *task, void *arg )
+static int __sem_task_wakeup( struct rtk_task *task, void *arg )
 {
     struct rtk_semaphore *semid = ( struct rtk_semaphore *)arg;
     
@@ -483,7 +484,7 @@ static int __sem_task_wakeup( struct rtk_tcb *task, void *arg )
 int semc_take( struct rtk_semaphore *semid, unsigned int tick )
 {
     int old;
-    struct rtk_tcb *ptcb_current = rtk_ptcb_current;
+    struct rtk_task *task_current = rtk_task_current;
 
 #if KERNEL_ARG_CHECK_EN
     if ( unlikely(semid->type != SEM_TYPE_COUNTER) ) {
@@ -503,10 +504,10 @@ int semc_take( struct rtk_semaphore *semid, unsigned int tick )
         arch_interrupt_enable(old );
         return -EAGAIN;
     }
-    __sem_add_pending_task( semid, ptcb_current );
-    __task_pend_internal( ptcb_current, tick, __sem_task_wakeup, semid );
+    __sem_add_pending_task( semid, task_current );
+    __task_pend_internal( task_current, tick, __sem_task_wakeup, semid );
     arch_interrupt_enable(old );
-    return -ptcb_current->err;
+    return -task_current->err;
 }
 
 /**
@@ -605,7 +606,7 @@ int semb_init( struct rtk_semaphore *semid, int initcount )
 int semb_take( struct rtk_semaphore *semid, unsigned int tick )
 {
     int old;
-    struct rtk_tcb *ptcb_current = rtk_ptcb_current;
+    struct rtk_task *task_current = rtk_task_current;
 
 #ifndef KERNEL_ARG_CHECK_EN
     if ( semid->type != SEM_TYPE_BINARY ) {
@@ -625,10 +626,10 @@ int semb_take( struct rtk_semaphore *semid, unsigned int tick )
         arch_interrupt_enable(old );
         return -EAGAIN;
     }
-    __sem_add_pending_task( semid, ptcb_current );
-    __task_pend_internal( ptcb_current, tick, __sem_task_wakeup, semid );
+    __sem_add_pending_task( semid, task_current );
+    __task_pend_internal( task_current, tick, __sem_task_wakeup, semid );
     arch_interrupt_enable( old );
-    return -ptcb_current->err;
+    return -task_current->err;
 }
 
 /**
@@ -711,7 +712,7 @@ int mutex_init( struct rtk_mutex *semid )
     return 0;
 }
 
-static int __mutex_task_wakeup( struct rtk_tcb*task, void *arg )
+static int __mutex_task_wakeup( struct rtk_task*task, void *arg )
 {
     struct rtk_mutex *mutex = ( struct rtk_mutex* )arg;
     if (( task->err==0|| task->err==ETIME ) &&  mutex->s.u.owner == NULL ) {
@@ -742,7 +743,7 @@ static int __mutex_task_wakeup( struct rtk_tcb*task, void *arg )
 int mutex_lock( struct rtk_mutex *semid, unsigned int tick )
 {
     int old;
-    struct rtk_tcb *ptcb_current = rtk_ptcb_current;
+    struct rtk_task *task_current = rtk_task_current;
 
 #if KERNEL_ARG_CHECK_EN
     if ( unlikely(IS_INT_CONTEXT()) ) {
@@ -754,11 +755,11 @@ int mutex_lock( struct rtk_mutex *semid, unsigned int tick )
 #endif
     old = arch_interrupt_disable();
     if ( semid->s.u.owner == NULL ) {
-        __mutex_owner_set( semid, ptcb_current );
+        __mutex_owner_set( semid, task_current );
         semid->mutex_recurse_count++;
         arch_interrupt_enable(old );
         return 0;
-    } else if ( semid->s.u.owner == ptcb_current ) {
+    } else if ( semid->s.u.owner == task_current ) {
         semid->mutex_recurse_count++;
         arch_interrupt_enable(old );
         return 0;
@@ -781,12 +782,12 @@ int mutex_lock( struct rtk_mutex *semid, unsigned int tick )
     /*
      *  put tcb into pend list and inherit priority.
      */
-    if ( __mutex_add_pending_task_trig( &semid->s, ptcb_current ) ) {
-        __mutex_raise_owner_priority( semid, ptcb_current->current_priority );
+    if ( __mutex_add_pending_task_trig( &semid->s, task_current ) ) {
+        __mutex_raise_owner_priority( semid, task_current->current_priority );
     }
-    __task_pend_internal( ptcb_current, tick, __mutex_task_wakeup, semid );
+    __task_pend_internal( task_current, tick, __mutex_task_wakeup, semid );
     arch_interrupt_enable( old );
-    return -ptcb_current->err;
+    return -task_current->err;
 }
 /**
  *  \brief release a mutex lock.
@@ -801,7 +802,7 @@ int mutex_lock( struct rtk_mutex *semid, unsigned int tick )
 int mutex_unlock( struct rtk_mutex *semid )
 {
     int old;
-    struct rtk_tcb *ptcb_current = rtk_self();
+    struct rtk_task *task_current = task_self();
     
 #ifndef KERNEL_NO_ARG_CHECK
     if ( unlikely(semid->s.type != SEM_TYPE_MUTEX) ) {
@@ -812,7 +813,7 @@ int mutex_unlock( struct rtk_mutex *semid )
     }
 #endif
     old = arch_interrupt_disable();
-    if ( semid->s.u.owner != ptcb_current ) {
+    if ( semid->s.u.owner != task_current ) {
         arch_interrupt_enable(old );
         return -EPERM;
     }
@@ -855,9 +856,9 @@ int mutex_terminate( struct rtk_mutex *semid )
 #if CONFIG_DEAD_LOCK_DETECT_EN
 static int __mutex_dead_lock_detected( struct rtk_mutex *semid )
 {
-    struct rtk_tcb *powner;
+    struct rtk_task *powner;
     struct rtk_mutex *s = semid;
-    struct rtk_tcb *ptcb_current = rtk_self();
+    struct rtk_task *task_current = task_self();
     
     powner = s->s.u.owner;
 again:
@@ -865,7 +866,7 @@ again:
         s = (struct rtk_mutex *)PLIST_PTR_TO_SEMID( powner->pending_resource );
         if ( s->s.type == SEM_TYPE_MUTEX ) {
             powner = s->s.u.owner;
-            if ( powner == ptcb_current  )
+            if ( powner == task_current  )
                 return 1;
             goto again;
         }
@@ -877,12 +878,12 @@ again:
 #if CONFIG_DEAD_LOCK_SHOW_EN
 void __mutex_dead_lock_show( struct rtk_mutex *mutex )
 {
-    struct rtk_tcb *powner;
+    struct rtk_task *powner;
     struct rtk_mutex *s = mutex;
-    struct rtk_tcb *ptcb_current = rtk_self();
+    struct rtk_task *task_current = task_self();
     powner = s->s.u.owner;
 
-    kprintf("Dead lock path:\n task %s pending on 0x%08X", ptcb_current->name, mutex);
+    kprintf("Dead lock path:\n task %s pending on 0x%08X", task_current->name, mutex);
 again:
     kprintf(", taken by %s", powner->name );
     if ( powner->status & TASK_PENDING ) {
@@ -890,7 +891,7 @@ again:
         kprintf(", and pending on 0x%08X ", s );
         if ( s->s.type == SEM_TYPE_MUTEX ) {
             powner = s->s.u.owner;
-            if ( powner == ptcb_current ) {
+            if ( powner == task_current ) {
                 kprintf(", taken by %s\n", powner->name );
                 return;
             }
@@ -916,24 +917,24 @@ void __release_one_mutex( struct rtk_mutex *semid, int error_code )
 static
 int __sem_pend_list_priority_get ( struct rtk_semaphore *semid )
 {
-    struct rtk_tcb *ptcb;
+    struct rtk_task *task;
     
     if ( !list_empty(&semid->pending_tasks) ) {
-        ptcb = PEND_NODE_TO_PTCB( LIST_HEAD_FIRST(&semid->pending_tasks) );
-        return ptcb->current_priority;
+        task = PEND_NODE_TO_PTCB( LIST_HEAD_FIRST(&semid->pending_tasks) );
+        return task->current_priority;
     }
     return MAX_PRIORITY+1;
 }
 
 static
-void __sem_add_pending_task( struct rtk_semaphore *semid, struct rtk_tcb *task )
+void __sem_add_pending_task( struct rtk_semaphore *semid, struct rtk_task *task )
 {
-    struct rtk_tcb   *ptcb;
+    struct rtk_task  *task_i;
     struct list_head *p;
     
     list_for_each( p, &semid->pending_tasks) {
-        ptcb = PEND_NODE_TO_PTCB( p );
-        if ( ptcb->current_priority > task->current_priority ) {
+        task_i = PEND_NODE_TO_PTCB( p );
+        if ( task_i->current_priority > task->current_priority ) {
             break;
         }
     }
@@ -943,20 +944,20 @@ void __sem_add_pending_task( struct rtk_semaphore *semid, struct rtk_tcb *task )
 }
 
 static
-void __task_detach_pending_sem( struct rtk_tcb *task )
+void __task_detach_pending_sem( struct rtk_task *task )
 {
     list_del_init( &task->sem_node );
     task->pending_resource = NULL;
 }
 
 static
-int __sem_resort_pend_list_trig( struct rtk_semaphore *semid, struct rtk_tcb *ptcb )
+int __sem_resort_pend_list_trig( struct rtk_semaphore *semid, struct rtk_task *task )
 {
     int pri;
 
-    __task_detach_pending_sem( ptcb );
+    __task_detach_pending_sem( task );
     pri = __sem_pend_list_priority_get(semid);
-    __sem_add_pending_task( semid, ptcb );
+    __sem_add_pending_task( semid, task );
     return pri > __sem_pend_list_priority_get(semid);
 }
 
@@ -966,22 +967,22 @@ int __sem_wakeup_penders( struct rtk_semaphore *semid, int err, int count )
     register int               n;
     register struct list_head *p;
     register struct list_head *save;
-    register struct rtk_tcb   *ptcbwakeup;
+    register struct rtk_task   *taskwakeup;
 
     n = 0;
     list_for_each_safe( p, save, &semid->pending_tasks ) {
-        ptcbwakeup = PEND_NODE_TO_PTCB( p );
+        taskwakeup = PEND_NODE_TO_PTCB( p );
         /*
          *  some one notice us error ocurse with sem, we must detach
          *  task from sem.
          */
         if ( err ) {                    /*!  really wake up the task */
-            __task_detach_pending_sem( ptcbwakeup );
-            __rtk_tick_down_counter_remove( &ptcbwakeup->tick_node );
-            ptcbwakeup->status    = TASK_READY;
+            __task_detach_pending_sem( taskwakeup );
+            __rtk_tick_down_counter_remove( &taskwakeup->tick_node );
+            taskwakeup->status    = TASK_READY;
         }
-        READY_Q_PUT( ptcbwakeup, ptcbwakeup->current_priority );
-        ptcbwakeup->err       = err;
+        READY_Q_PUT( taskwakeup, taskwakeup->current_priority );
+        taskwakeup->err       = err;
         if ( ++n == count ) {
             break;
         }
@@ -991,19 +992,19 @@ int __sem_wakeup_penders( struct rtk_semaphore *semid, int err, int count )
 
 #if CONFIG_MUTEX_EN
 static
-int __task_mutex_hold_list_priority_get ( struct rtk_tcb *ptcb )
+int __task_mutex_hold_list_priority_get ( struct rtk_task *task )
 {
     struct rtk_mutex *semid;
 
-    if ( !list_empty(&ptcb->mutex_holded_head) ) {
-        semid = SEM_MEMBER_PTR_TO_SEMID( LIST_HEAD_FIRST(&ptcb->mutex_holded_head) );
+    if ( !list_empty(&task->mutex_holded_head) ) {
+        semid = SEM_MEMBER_PTR_TO_SEMID( LIST_HEAD_FIRST(&task->mutex_holded_head) );
         return __sem_pend_list_priority_get((struct rtk_semaphore*)semid);
     }
     return MAX_PRIORITY+1;
 }
 
 static
-int  __mutex_owner_set( struct rtk_mutex *semid, struct rtk_tcb *task )
+int  __mutex_owner_set( struct rtk_mutex *semid, struct rtk_task *task )
 {
     struct list_head *p;
     struct rtk_mutex *psem;
@@ -1030,7 +1031,7 @@ int  __mutex_owner_set( struct rtk_mutex *semid, struct rtk_tcb *task )
 }
 
 static
-int __resort_hold_mutex_list_and_trig( struct rtk_mutex *semid, struct rtk_tcb *task )
+int __resort_hold_mutex_list_and_trig( struct rtk_mutex *semid, struct rtk_task *task )
 {
     int pri;
     __mutex_owner_set(semid, NULL);
@@ -1041,12 +1042,12 @@ int __resort_hold_mutex_list_and_trig( struct rtk_mutex *semid, struct rtk_tcb *
 
 
 static
-int __mutex_add_pending_task_trig( struct rtk_semaphore *semid, struct rtk_tcb *ptcb )
+int __mutex_add_pending_task_trig( struct rtk_semaphore *semid, struct rtk_task *task )
 {
     int pri;
 
     pri = __sem_pend_list_priority_get(semid);
-    __sem_add_pending_task( semid, ptcb );
+    __sem_add_pending_task( semid, task );
     return pri > __sem_pend_list_priority_get(semid);
 }
 
@@ -1054,7 +1055,7 @@ static
 int __mutex_raise_owner_priority( struct rtk_mutex *semid, int priority )
 {
     int ret = 0;
-    struct rtk_tcb *powner;
+    struct rtk_task *powner;
     powner   = semid->s.u.owner;
 
 again:
@@ -1086,22 +1087,22 @@ static
 void __restore_current_task_priority ( struct rtk_mutex *semid )
 {
     int priority;
-    struct rtk_tcb *ptcb_current = rtk_self();
+    struct rtk_task *task_current = task_self();
 
     /*
      *  find the highest priority needed to setup,
      *  which is from the mutex of current task holded.
      *  it will be always the first one of MutexHeadList.
      */
-    priority = __task_mutex_hold_list_priority_get(ptcb_current);
-    if ( priority > ptcb_current->priority ) {
-        priority = ptcb_current->priority;
+    priority = __task_mutex_hold_list_priority_get(task_current);
+    if ( priority > task_current->priority ) {
+        priority = task_current->priority;
     }
 
-    if ( unlikely(priority != ptcb_current->current_priority )) {
-        READY_Q_REMOVE( ptcb_current );
-        READY_Q_PUT( ptcb_current, priority );
-        ptcb_current->current_priority = priority;
+    if ( unlikely(priority != task_current->current_priority )) {
+        READY_Q_REMOVE( task_current );
+        READY_Q_PUT( task_current, priority );
+        task_current->current_priority = priority;
     }
 }
 
@@ -1114,7 +1115,7 @@ void __restore_current_task_priority ( struct rtk_mutex *semid )
  *  
  *  @brief set task priority 
  *  @fn task_priority_set
- *  @param[in]  ptcb            task control block pointer. If NULL, current task's
+ *  @param[in]  task            task control block pointer. If NULL, current task's
  *                              priority will be change.
  *  @param[in]  new_priority    new priority.
  *  @return     0               successfully.
@@ -1133,58 +1134,58 @@ void __restore_current_task_priority ( struct rtk_mutex *semid )
  *                     |                  |
  *              current priority    normal priority
  */
-int task_priority_set( struct rtk_tcb *ptcb, unsigned int priority )
+int task_priority_set( struct rtk_task *task, unsigned int priority )
 {
     int old;
     int ret = 0;
     int need = 0;/* need to call scheduler */
 
-    if ( ptcb == NULL ) {
-        ptcb = rtk_self();
+    if ( task == NULL ) {
+        task = task_self();
     }
     if ( priority > MAX_PRIORITY ) {
         return -EINVAL;
     }
     old = arch_interrupt_disable();
 
-    if ( TASK_PREPARED == ptcb->status ||
-         TASK_DEAD == ptcb->status  ) {
+    if ( TASK_PREPARED == task->status ||
+         TASK_DEAD == task->status  ) {
         ret = -EPERM;
         goto done;
     }
 #if CONFIG_MUTEX_EN
-    if ( ptcb->priority == priority ) {
+    if ( task->priority == priority ) {
         goto done;
     }
     
-    ptcb->priority = priority;
-    if ( priority < ptcb->current_priority ) {     /* priority goes up */
-        ptcb->current_priority = priority;
-    } else if ( __task_mutex_hold_list_priority_get( ptcb ) >= priority ) {
-        ptcb->current_priority = priority;/* priority can go down at the moment. */
+    task->priority = priority;
+    if ( priority < task->current_priority ) {     /* priority goes up */
+        task->current_priority = priority;
+    } else if ( __task_mutex_hold_list_priority_get( task ) >= priority ) {
+        task->current_priority = priority;/* priority can go down at the moment. */
     }
 #else
-    ptcb->current_priority = priority;
+    task->current_priority = priority;
 #endif
 
-    if ( ptcb->status & TASK_PENDING ) {
+    if ( task->status & TASK_PENDING ) {
         struct rtk_semaphore *semid;
         int          trig;
-        semid   = PLIST_PTR_TO_SEMID( ptcb->pending_resource );
-        trig = __sem_resort_pend_list_trig( (struct rtk_semaphore*)semid, ptcb );
+        semid   = PLIST_PTR_TO_SEMID( task->pending_resource );
+        trig = __sem_resort_pend_list_trig( (struct rtk_semaphore*)semid, task );
 #if CONFIG_MUTEX_EN
         if ( trig && semid->type == SEM_TYPE_MUTEX ) {
-            need = __mutex_raise_owner_priority( (struct rtk_mutex*)semid, ptcb->current_priority );
+            need = __mutex_raise_owner_priority( (struct rtk_mutex*)semid, task->current_priority );
         }
 #else
         (void)trig;
 #endif
     }
 
-    if ( (ptcb->status == TASK_READY) &&
-         (ptcb->current_priority == priority) ) {
-        READY_Q_REMOVE( ptcb );
-        READY_Q_PUT( ptcb, ptcb->current_priority );
+    if ( (task->status == TASK_READY) &&
+         (task->current_priority == priority) ) {
+        READY_Q_REMOVE( task );
+        READY_Q_PUT( task, task->current_priority );
         need = 1;
     }
     if ( need && !IS_INT_CONTEXT()) {
@@ -1199,7 +1200,7 @@ done:
 
 /** @} */
 
-struct rtk_tcb *task_init(struct rtk_tcb *ptcb, 
+struct rtk_task *task_init(struct rtk_task *task, 
                           const char     *name,
                           int             priority, /* priority of new task */
                           int             option, /* task option word */
@@ -1209,50 +1210,52 @@ struct rtk_tcb *task_init(struct rtk_tcb *ptcb,
                           void           *arg1, /* 1st of 10 req'd args to pass to entryPt */
                           void           *arg2)
 {
-    ptcb->current_priority = priority;
-    ptcb->status           = TASK_PREPARED;
-    ptcb->pending_resource = (void*)0;
-    ptcb->option           = option;
-    ptcb->stack_low        = stack_low;
-    ptcb->stack_high       = stack_high;
-    ptcb->name             = name;
+    task->current_priority = priority;
+    task->status           = TASK_PREPARED;
+    task->pending_resource = (void*)0;
+    task->option           = option;
+    task->stack_low        = stack_low;
+    task->stack_high       = stack_high;
+    task->name             = name;
 #if CONFIG_MUTEX_EN
-    ptcb->priority         = priority;
+    task->priority         = priority;
 #endif
 #if CONFIG_TASK_TERMINATE_EN
-    ptcb->safe_count       = 0;
+    task->safe_count       = 0;
 #endif
 
-    ptcb->sp = arch_stack_init( pfunc, arg1, arg2, stack_low, stack_high, task_exit );
-    INIT_LIST_HEAD( &ptcb->prio_node.node );
-    INIT_LIST_HEAD( &ptcb->sem_node );
+    task->sp = arch_stack_init( pfunc, arg1, arg2, stack_low, stack_high, task_exit );
+    INIT_LIST_HEAD( &task->prio_node.node );
+    INIT_LIST_HEAD( &task->sem_node );
 #if CONFIG_MUTEX_EN
-    INIT_LIST_HEAD( &ptcb->mutex_holded_head );
+    INIT_LIST_HEAD( &task->mutex_holded_head );
 #endif
-    INIT_LIST_HEAD( &ptcb->task_list_node );
-    __rtk_tick_down_counter_init( &ptcb->tick_node );
-    __rtk_tick_down_counter_set_func( &ptcb->tick_node, task_delay_timeout );
-    return ptcb;
+    INIT_LIST_HEAD( &task->task_list_node );
+    __rtk_tick_down_counter_init( &task->tick_node );
+    __rtk_tick_down_counter_set_func( &task->tick_node,
+                                      (void(*)(void*))task_delay_timeout,
+                                      &task->tick_node);
+    return task;
 }
 
-int task_startup( struct rtk_tcb *ptcb )
+int task_startup( struct rtk_task *task )
 {
     int old;
     int ret = 0;
 
     old = arch_interrupt_disable();
-    if ( ptcb->status != TASK_PREPARED ) {
+    if ( task->status != TASK_PREPARED ) {
         arch_interrupt_enable(old );
         return -EPERM;
     }
 
-    list_add_tail( &ptcb->task_list_node, &g_systerm_tasks_head );
-    READY_Q_PUT( ptcb, ptcb->current_priority );
-    ptcb->status = TASK_READY;
+    list_add_tail( &task->task_list_node, &g_systerm_tasks_head );
+    READY_Q_PUT( task, task->current_priority );
+    task->status = TASK_READY;
     /*
      *  do not call scheduler while kernel is not running ( at startup point ).
      */
-    if ( NULL != rtk_self() ) {
+    if ( NULL != task_self() ) {
         schedule_internel();
         ret = 0;
     }
@@ -1264,25 +1267,25 @@ int task_startup( struct rtk_tcb *ptcb )
 #if CONFIG_TASK_TERMINATE_EN
 int task_safe( void )
 {
-    ++rtk_self()->safe_count;
+    ++task_self()->safe_count;
     return 0;
 }
 int task_unsafe( void )
 {
-    --rtk_self()->safe_count;
+    --task_self()->safe_count;
     return 0;
 }
 /**
  *  \brief stop a task.
  *
- *  \param[in]  ptcb    task control block pointer.
- *                      If NULL, it will equal to rtk_ptcb_current.
+ *  \param[in]  task    task control block pointer.
+ *                      If NULL, it will equal to rtk_task_current.
  *
  *  \return     0       successfully.
  *  \return     -EPERM  Permission denied:
  *                      It is protected by calling task_safe().
  */
-int task_terminate( struct rtk_tcb *ptcb )
+int task_terminate( struct rtk_task *task )
 {
     int old;
     int ret = 0;
@@ -1290,12 +1293,12 @@ int task_terminate( struct rtk_tcb *ptcb )
     struct list_head *save, *p;
 #endif
 
-    if ( ptcb == NULL ) {
-        ptcb = rtk_self();
+    if ( task == NULL ) {
+        task = task_self();
     }
 
     old = arch_interrupt_disable();
-    if ( ptcb->safe_count ) {
+    if ( task->safe_count ) {
         ret = -EPERM;
         goto done;
     }
@@ -1303,23 +1306,23 @@ int task_terminate( struct rtk_tcb *ptcb )
     /*
      *  remove delay node
      */
-    if ( !list_empty( &(ptcb->tick_node.node) )) {
-        __rtk_tick_down_counter_remove( &ptcb->tick_node );
+    if ( !list_empty( &(task->tick_node.node) )) {
+        __rtk_tick_down_counter_remove( &task->tick_node );
     }
 #if CONFIG_MUTEX_EN
     /*
      *  release all mutex.
      */
-    list_for_each_safe(p, save, &ptcb->mutex_holded_head){
+    list_for_each_safe(p, save, &task->mutex_holded_head){
         struct rtk_mutex *psemid;
         psemid = SEM_MEMBER_PTR_TO_SEMID( p );
         __release_one_mutex( psemid, ENXIO );
     }
 #endif
 
-    READY_Q_REMOVE( ptcb );
-    list_del_init( &ptcb->task_list_node );
-    ptcb->status = TASK_DEAD;
+    READY_Q_REMOVE( task );
+    list_del_init( &task->task_list_node );
+    task->status = TASK_DEAD;
     schedule_internel();
 
 done:
@@ -1331,12 +1334,12 @@ done:
 static
 void schedule_internel( void )
 {
-    struct rtk_tcb *p;
+    struct rtk_task *p;
 
     p = highest_tcb_get();
-    if ( p != rtk_ptcb_current) {
-        struct rtk_tcb *p_old;
-        p_old = rtk_self();
+    if ( p != rtk_task_current) {
+        struct rtk_task *p_old;
+        p_old = task_self();
         rtk_set_self(p);
         arch_context_switch( &p_old->sp, &p->sp);        
     }
@@ -1345,17 +1348,17 @@ void schedule_internel( void )
 void schedule( void )
 {
     int    old;
-    struct rtk_tcb *ptcb_last;
-    struct rtk_tcb *ptcb_current = rtk_self();
+    struct rtk_task *task_last;
+    struct rtk_task *task_current = task_self();
 
     old = arch_interrupt_disable();
-    ptcb_last = ptcb_current;
-    ptcb_current = rtk_set_self( highest_tcb_get() );
-    if ( ptcb_current != ptcb_last ) {
+    task_last = task_current;
+    task_current = rtk_set_self( highest_tcb_get() );
+    if ( task_current != task_last ) {
         if ( IS_INT_CONTEXT() ) {
-            arch_context_switch_interrupt( &ptcb_last->sp, &ptcb_current->sp );
+            arch_context_switch_interrupt( &task_last->sp, &task_current->sp );
         } else {
-            arch_context_switch( &ptcb_last->sp, &ptcb_current->sp );
+            arch_context_switch( &task_last->sp, &task_current->sp );
         }
     }
     arch_interrupt_enable(old);
@@ -1364,30 +1367,30 @@ void schedule( void )
 static
 void task_exit( void )
 {
-    struct rtk_tcb *ptcb;
-    struct rtk_tcb *ptcb_current = rtk_self();
+    struct rtk_task *task;
+    struct rtk_task *task_current = task_self();
 #if CONFIG_MUTEX_EN
     struct list_head *save, *p;
 #endif
 
     arch_interrupt_disable();
-    ptcb_current->status = TASK_DEAD;
-    READY_Q_REMOVE( ptcb_current );
-    list_del_init( &ptcb_current->task_list_node );
+    task_current->status = TASK_DEAD;
+    READY_Q_REMOVE( task_current );
+    list_del_init( &task_current->task_list_node );
 
 #if CONFIG_MUTEX_EN
     /*
      *  release all mutex.
      */
-    list_for_each_safe(p, save, &ptcb_current->mutex_holded_head){
+    list_for_each_safe(p, save, &task_current->mutex_holded_head){
         struct rtk_mutex *psemid;
         psemid = SEM_MEMBER_PTR_TO_SEMID( p );
         __release_one_mutex( psemid, ENXIO );
     }
 #endif
-    ptcb = PRIO_NODE_TO_PTCB( g_readyq.phighest_node );
-    rtk_set_self(  ptcb );
-    arch_context_switch_to(&ptcb->sp);
+    task = PRIO_NODE_TO_PTCB( g_readyq.phighest_node );
+    rtk_set_self(  task );
+    arch_context_switch_to(&task->sp);
 }
 
 
@@ -1624,40 +1627,18 @@ void rtk_tick_down_counter_init(struct rtk_tick *_this)
     __rtk_tick_down_counter_init(_this);
 }
     
-int rtk_tick_down_counter_set_func( struct rtk_tick *_this, void (*func)(struct rtk_tick *) )
+int rtk_tick_down_counter_set_func( struct rtk_tick *_this,
+                                    void (*func)(void*),
+                                    void            *arg )
 {
     int old;
     old = arch_interrupt_disable();
-    __rtk_tick_down_counter_set_func(_this, func);
+    __rtk_tick_down_counter_set_func(_this, func, arg );
     arch_interrupt_enable(old);
     return 0;
 }
 
-int rtk_tick_down_counter_add( struct rtk_tick *_this, unsigned int tick )
-{
-    int old;
-    int ok = 0;
-    
-    old = arch_interrupt_disable();
-    if ( list_empty(&_this->node) )
-    {
-        __rtk_tick_down_counter_add( _this, tick );
-    } else {
-        ok = -EEXIST;
-    }
-    arch_interrupt_enable( old );
-    return ok;
-}
-
-void rtk_tick_down_counter_remove ( struct rtk_tick *_this )
-{
-    int old;
-    old = arch_interrupt_disable();
-    __rtk_tick_down_counter_remove( _this );
-    arch_interrupt_enable( old );
-}
-
-void rtk_tick_down_counter_set( struct rtk_tick *_this, unsigned int tick )
+void rtk_tick_down_counter_start( struct rtk_tick *_this, unsigned int tick )
 {
     int old;
     
@@ -1666,5 +1647,14 @@ void rtk_tick_down_counter_set( struct rtk_tick *_this, unsigned int tick )
     __rtk_tick_down_counter_add( _this, tick );
     arch_interrupt_enable( old );
 }
+
+void rtk_tick_down_counter_stop ( struct rtk_tick *_this )
+{
+    int old;
+    old = arch_interrupt_disable();
+    __rtk_tick_down_counter_remove( _this );
+    arch_interrupt_enable( old );
+}
+
 
 #endif

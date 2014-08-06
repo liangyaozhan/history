@@ -5,20 +5,20 @@
 #include "rtk.h"
 
 
-struct rtk_tcb *rtkfork_croutine( int *sp, int priority )
+struct rtk_task *rtkfork_croutine( int *sp, int priority )
 {
 #if 0
     int size;
     void *spBase;
-    struct rtk_tcb *ptcb;
+    struct rtk_task *task;
     int old;
-    size    = ptcb_current->StackSize;
+    size    = task_current->StackSize;
     spBase  = (void*)malloc( size );
     if ( NULL == spBase) {
         return NULL;
     }
-    ptcb = (struct rtk_tcb*)malloc( sizeof(struct rtk_tcb) );
-    if ( NULL == ptcb ) {
+    task = (struct rtk_task*)malloc( sizeof(struct rtk_task) );
+    if ( NULL == task ) {
         free( spBase );
         return NULL;
     }
@@ -26,41 +26,41 @@ struct rtk_tcb *rtkfork_croutine( int *sp, int priority )
     /*
      *  init tcb struct
      */
-    memcpy( ptcb, ptcb_current, sizeof(*ptcb));
-    ptcb->RunningPriority = ptcb->priority = priority;
-    INIT_LIST_HEAD( &ptcb->prioNode.node );
-    INIT_LIST_HEAD( &ptcb->TickNode.node );
-    INIT_LIST_HEAD( &ptcb->pendNode );
-    INIT_LIST_HEAD( &ptcb->MutexHoldHead );
-    INIT_LIST_HEAD( &ptcb->taskListNode );
-    _REENT_INIT_PTR( &ptcb->reent );
-    CHECK_INIT( &ptcb->reent );
+    memcpy( task, task_current, sizeof(*task));
+    task->RunningPriority = task->priority = priority;
+    INIT_LIST_HEAD( &task->prioNode.node );
+    INIT_LIST_HEAD( &task->TickNode.node );
+    INIT_LIST_HEAD( &task->pendNode );
+    INIT_LIST_HEAD( &task->MutexHoldHead );
+    INIT_LIST_HEAD( &task->taskListNode );
+    _REENT_INIT_PTR( &task->reent );
+    CHECK_INIT( &task->reent );
 
-    ptcb->vBase      = spBase;
-    ptcb->name       = spBase;
-    ptcb->ulTickUsed = 0;
-    ptcb->err        = 0;
-    ptcb->handle     = handle_alloc( g_pidlib, ptcb, HANDLE_TYPE_PID );
+    task->vBase      = spBase;
+    task->name       = spBase;
+    task->ulTickUsed = 0;
+    task->err        = 0;
+    task->handle     = handle_alloc( g_pidlib, task, HANDLE_TYPE_PID );
 
     /*
      *  copy the hold stack
      */
-    memcpy( ptcb->vBase, ptcb_current->vBase, ptcb_current->StackSize);
+    memcpy( task->vBase, task_current->vBase, task_current->StackSize);
 
     /*
      *  set the right stack pointor. This pointor is from the caller.
      */
-    ptcb->sp = (STACK_TYPE *)((char*)ptcb->vBase +
-                              ((char*)sp-(char*)ptcb_current->vBase));
+    task->sp = (STACK_TYPE *)((char*)task->vBase +
+                              ((char*)sp-(char*)task_current->vBase));
     
     old = KERNEL_ENTER_CRITICAL();
-    list_add_tail( &ptcb->taskListNode, &GlistAllTaskListHead );
-    READY_Q_PUT( ptcb, priority );
+    list_add_tail( &task->taskListNode, &GlistAllTaskListHead );
+    READY_Q_PUT( task, priority );
     KERNEL_EXIT_CRITICAL( old );
     
     KERNEL_EXIT();
 
-    return ptcb;
+    return task;
 #else
     return 0;
     #endif

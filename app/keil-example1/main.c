@@ -29,7 +29,7 @@ void main_task( void *pa, void *pb)
     
     TASK_INIT( "led", info_led0, 7, led_task, 0, 0 );
     TASK_STARTUP(info_led0);
-    task_priority_set( ptcb_current, 7 );
+    task_priority_set( task_current, 7 );
     test_uart_isr_init();
     while (1) {
 				rt_hw_led_off(1);

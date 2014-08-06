@@ -480,7 +480,7 @@ rt_inline int zoneindex(uint32_t *bytes)
  * @return the allocated memory
  *
  */
-void *malloc(size_t size)
+void *rtk_malloc(size_t size)
 {
 	slab_zone *z;
 	int32_t zi;
@@ -673,16 +673,16 @@ fail:
  *
  * @return the allocated memory
  */
-void *realloc(void *ptr, size_t size)
+void *rtk_realloc(void *ptr, size_t size)
 {
 	void *nptr;
 	slab_zone *z;
 	struct memusage *kup;
 
-	if (ptr == RT_NULL) return malloc(size);
+	if (ptr == RT_NULL) return rtk_malloc(size);
 	if (size == 0)
 	{
-		free(ptr);
+		rtk_free(ptr);
 		return RT_NULL;
 	}
 
@@ -697,9 +697,9 @@ void *realloc(void *ptr, size_t size)
 		size_t osize;
 
 		osize = kup->size << RT_MM_PAGE_BITS;
-		if ((nptr = malloc(size)) == RT_NULL) return RT_NULL;
+		if ((nptr = rtk_malloc(size)) == RT_NULL) return RT_NULL;
 		memcpy(nptr, ptr, size > osize ? osize : size);
-		free(ptr);
+		rtk_free(ptr);
 
 		return nptr;
 	}
@@ -716,10 +716,10 @@ void *realloc(void *ptr, size_t size)
 		 * already adjusted the request size to the appropriate chunk size, which
 		 * should optimize our bcopy().  Then copy and return the new pointer.
 		 */
-		if ((nptr = malloc(size)) == RT_NULL) return RT_NULL;
+		if ((nptr = rtk_malloc(size)) == RT_NULL) return RT_NULL;
 
 		memcpy(nptr, ptr, size > z->z_chunksize ? z->z_chunksize : size);
-		free(ptr);
+		rtk_free(ptr);
 
 		return nptr;
 	}
@@ -739,12 +739,12 @@ void *realloc(void *ptr, size_t size)
  *
  * @return pointer to allocated memory / NULL pointer if there is an error
  */
-void *calloc(size_t count, size_t size)
+void *rtk_calloc(size_t count, size_t size)
 {
 	void *p;
 
 	/* allocate 'count' objects of size 'size' */
-	p = malloc(count * size);
+	p = rtk_malloc(count * size);
 
 	/* zero the memory */
 	if (p) memset(p, 0, count * size);
@@ -758,7 +758,7 @@ void *calloc(size_t count, size_t size)
  *
  * @param ptr the address of memory which will be released
  */
-void free(void *ptr)
+void rtk_free(void *ptr)
 {
 	slab_zone *z;
 	slab_chunk *chunk;

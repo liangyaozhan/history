@@ -54,7 +54,7 @@ static void led_task1( void *pa, void *pb)
 }
 
 #define MAX_T 1000
-struct rtk_tcb *tcbs[MAX_T];
+struct rtk_task *tcbs[MAX_T];
 #define MAX_M 50
 struct rtk_mutex mutexs[1000];
 struct rtk_semaphore sem;
@@ -100,9 +100,9 @@ void mtask( void )
             pm[i] = &mutexs[ rand()%(sizeof(mutexs)/sizeof(mutexs[0])) ];
             ret = mutex_lock( pm[i], /*rand()%100 + 100*/-1 );
             if ( ret ) {
-                kprintf("%s: (%d)@%d mutex_lock error: ret=%d\n",CURRENT_TASK_NAME(), rtk_self()->priority, rtk_self()->current_priority, ret );
+                kprintf("%s: (%d)@%d mutex_lock error: ret=%d\n",CURRENT_TASK_NAME(), task_self()->priority, task_self()->current_priority, ret );
             } else {
-                kprintf("%s: (%d)@%d mutex_lock OK\n", CURRENT_TASK_NAME(), rtk_self()->priority, rtk_self()->current_priority);
+                kprintf("%s: (%d)@%d mutex_lock OK\n", CURRENT_TASK_NAME(), task_self()->priority, task_self()->current_priority);
             }
         }
         //p = malloc( size );
@@ -115,7 +115,7 @@ void mtask( void )
             mutex_unlock( pm[order[n-1-i]] );
         }
         memory_info( &total, &used, &max_used  );
-        kprintf("%s : (%d) running at %d malloc info: %d(%X) %d %d\n",CURRENT_TASK_NAME(), rtk_self()->priority, rtk_self()->current_priority, total, total, used, max_used );
+        kprintf("%s : (%d) running at %d malloc info: %d(%X) %d %d\n",CURRENT_TASK_NAME(), task_self()->priority, task_self()->current_priority, total, total, used, max_used );
         //if ( p ) {
         //    free(p);
         //}
@@ -154,7 +154,7 @@ static void timer_callback( struct timer_obj *_this )
         "\n***********************************************\n",
         _this,_this->name
         );
-    rtk_tick_down_counter_add( &_this->base, _this->period );
+    rtk_tick_down_counter_start( &_this->base, _this->period );
 }
 
 int rtk_sprintf( char *buff, const char* str, ... );
@@ -163,7 +163,7 @@ void *fb_back_get( void );void fb_flip( void );
 
 void main_task( void *pa, void *pb)
 {
-    struct rtk_tcb      *ptcb;
+    struct rtk_task      *task;
     extern int  __sys_heap_start__;
     extern int  __sys_heap_end__;
     int         i = 0;
@@ -180,13 +180,13 @@ void main_task( void *pa, void *pb)
     };
 
     rtk_tick_down_counter_init( &timer0 );
-    rtk_tick_down_counter_set_func( &timer0, timer_callback );
-    rtk_tick_down_counter_add( &timer0, timer0.period );
+    rtk_tick_down_counter_set_func( &timer0, timer_callback, &timer0 );
+    rtk_tick_down_counter_start( &timer0, timer0.period );
     bsp_init();
     system_heap_init( &__sys_heap_start__, &__sys_heap_end__ );
 
     /* os_clk_init(); */
-    kprintf("\r\nsizeof tcb=%d\n", sizeof(struct rtk_tcb));
+    kprintf("\r\nsizeof tcb=%d\n", sizeof(struct rtk_task));
 
     for (i=0; i<sizeof(mutexs)/sizeof(mutexs[0]); i++) {
         mutex_init( &mutexs[i] );
@@ -196,8 +196,8 @@ void main_task( void *pa, void *pb)
     for (i = 0; i < MAX_T; i++) {
         priority = rand()%(MAX_PRIORITY-1);
         rtk_sprintf( name, "t%d-%d", i, priority );
-        ptcb = task_create(name, priority, 1024*32, 0, mtask, 1,2 );
-        tcbs[i] = ptcb;
+        task = task_create(name, priority, 1024*32, 0, mtask, 1,2 );
+        tcbs[i] = task;
     }
 
     task_delay( 500 );

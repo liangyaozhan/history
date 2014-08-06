@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-08-05 12:37:11, by lyzh>
+/* Last modified Time-stamp: <2014-08-06 07:38:05, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -37,15 +37,42 @@
  *  \name API configuration macro
  *  @{
  */
+#ifndef CONFIG_SEMC_EN
 #define CONFIG_SEMC_EN    1
+#endif
+
+#ifndef CONFIG_SEMB_EN
 #define CONFIG_SEMB_EN    1
+#endif
+
+#ifndef CONFIG_MUTEX_EN
 #define CONFIG_MUTEX_EN   1
+#endif
+
+#ifndef CONFIG_MSGQ_EN
 #define CONFIG_MSGQ_EN    1
+#endif
+
+#ifndef CONFIG_TASK_PRIORITY_SET_EN
 #define CONFIG_TASK_PRIORITY_SET_EN    1
+#endif
+
+#ifndef CONFIG_TASK_TERMINATE_EN
 #define CONFIG_TASK_TERMINATE_EN       1
+#endif
+
+#ifndef CONFIG_DEAD_LOCK_DETECT_EN
 #define CONFIG_DEAD_LOCK_DETECT_EN     1
+#endif
+
+#ifndef CONFIG_DEAD_LOCK_SHOW_EN
 #define CONFIG_DEAD_LOCK_SHOW_EN       1
+#endif
+
+#ifndef CONFIG_TICK_DOWN_COUNTER_EN
 #define CONFIG_TICK_DOWN_COUNTER_EN    1
+#endif
+
 /** @} */
 
 /**
@@ -58,6 +85,22 @@
 #endif
 
 /** @} */
+
+
+#if DEBUG>0
+#define ASSERT(condiction)                                              \
+    do{                                                                 \
+        if ( (condiction) )                                             \
+            break;                                                      \
+        kprintf("ASSERT " #condiction "failed: " __FILE__ ":%d: " ": " "\r\n", __LINE__); \
+        while (9);                                                      \
+    }while (0)
+#define KERNEL_ARG_CHECK_EN 1
+#else
+#define ASSERT(condiction)  do{}while(0)
+#define KERNEL_ARG_CHECK_EN 0
+#endif
+int  kprintf ( const char* str, ... );
 
 /** @} grp_rtkcfg */
 

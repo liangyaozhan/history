@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-08-05 13:01:08, by lyzh>
+/* Last modified Time-stamp: <2014-08-06 08:18:58, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -20,7 +20,7 @@
  */
 
 #ifndef __RTK_H
-#define __RTK_H
+#define __RTK_H 1
 
 
 #ifdef __cplusplus
@@ -53,9 +53,10 @@ extern "C" {
  */
 struct  rtk_tick
 {
-    struct list_head node;                        /*!< node to the link list     */
-    unsigned int     tick;                        /*!< tick count                */
-    void (*timeout_callback)( struct rtk_tick *); /*!< timeout callback function */
+    struct list_head  node;            /*!< node to the link list     */
+    unsigned int      tick;            /*!< tick count                */
+    void (*timeout_callback)( void *); /*!< timeout callback function */
+    void             *arg;
 };
 
 
@@ -78,7 +79,7 @@ struct rtk_private_priority_q_node
  *  option and safe_count is not used currently.
  *  @sa TASK_API
  */
-struct rtk_tcb
+struct rtk_task
 {
     void                               *sp;                /*!< stack pointor,        */
     const char                         *name;              /*!< task's name           */
@@ -112,7 +113,7 @@ struct rtk_semaphore
 {
     union {
         unsigned int        count; /*!< counter when it is semB or sem C    */
-        struct rtk_tcb     *owner; /*!< owner when it is mutex              */
+        struct rtk_task     *owner; /*!< owner when it is mutex              */
     }u;
     struct list_head        pending_tasks;          /*!< the pending tasks link list head    */
     unsigned char           type;                   /*!< Specifies the type of semaphore     */
@@ -159,11 +160,21 @@ struct rtk_msgq
  *  @defgroup task_status   task status definition
  *  @{
  */
+#ifndef TASK_READY
 #define TASK_READY              0x00
+#endif
+#ifndef TASK_PENDING
 #define TASK_PENDING            0x01
+#endif
+#ifndef TASK_DELAY
 #define TASK_DELAY              0x02
+#endif
+#ifndef TASK_DEAD
 #define TASK_DEAD               0xF0
+#endif
+#ifndef TASK_PREPARED
 #define TASK_PREPARED           0x5C
+#endif
 /**
  *  @}
  */
@@ -179,10 +190,18 @@ struct rtk_msgq
  *  @defgroup struct rtk_semaphoreype    semaphore type
  *  @{
  */
+#ifndef SEM_TYPE_NULL
 #define SEM_TYPE_NULL       0x00    /*!< semaphore type: NULL    */
+#endif
+#ifndef SEM_TYPE_BINARY
 #define SEM_TYPE_BINARY     0x01    /*!< semaphore type: binary  */
+#endif
+#ifndef SEM_TYPE_COUNTER
 #define SEM_TYPE_COUNTER    0x02    /*!< semaphore type: counter */
+#endif
+#ifndef SEM_TYPE_MUTEX
 #define SEM_TYPE_MUTEX      0x03    /*!< semaphore type: mutex   */
+#endif
 /**
  *  @}
  */
@@ -195,7 +214,9 @@ struct rtk_msgq
  *  @name waitforever
  *  @{
  */
+#ifndef WAIT_FOREVER
 #define WAIT_FOREVER    ((unsigned int)0xffffffff)
+#endif
 /**
  *  @}
  */
@@ -243,8 +264,8 @@ struct rtk_msgq
  *  }
  *  @endcode
  */
-/* #define TASK_INFO_DECL(info, stack_size) struct __taskinfo_##info {struct rtk_tcb tcb; char stack[stack_size]; }info */
-#define TASK_INFO_DEF(info, stack_size) struct __taskinfo_##info {struct rtk_tcb tcb; char stack[stack_size]; }info
+/* #define TASK_INFO_DECL(info, stack_size) struct __taskinfo_##info {struct rtk_task tcb; char stack[stack_size]; }info */
+#define TASK_INFO_DEF(info, stack_size) struct __taskinfo_##info {struct rtk_task tcb; char stack[stack_size]; }info
 
 /**
  *  @brief init task infomation
@@ -271,7 +292,7 @@ void rtk_init( void );
 /**
  * @brief task control block init.
  *
- * @param ptcb          pointor of task control block. You provide it.
+ * @param task          pointor of task control block. You provide it.
  * @param name          name of the task. This string is copied to the top of the stack.
  * @param priority      task normal running priority.
  * @param stack_low     low address of the stack.
@@ -281,11 +302,11 @@ void rtk_init( void );
  * @param arg2          argument 2 to the task.
  *
  *  A task is initialized by this function but not be added to running queue.
- *  A task_starup(ptcb) will add a initialized task to running queue.
+ *  A task_starup(task) will add a initialized task to running queue.
  *  So you must use function task_startup() to start a initialized task.
  * @sa task_starup();
  */
-struct rtk_tcb *task_init(struct rtk_tcb *ptcb,
+struct rtk_task *task_init(struct rtk_task *task,
                           const char     *name,
                           int             priority, /* priority of new task */
                           int             option, /* task option word */
@@ -300,7 +321,7 @@ struct rtk_tcb *task_init(struct rtk_tcb *ptcb,
  *
  *  add a task to running queue.
  */
-int task_startup( struct rtk_tcb *ptcb );
+int task_startup( struct rtk_task *task );
 
 
 /**
@@ -315,7 +336,7 @@ void rtk_startup( void );
 /**
  *  @brief set task priority 
  *  @fn task_priority_set
- *  @param[in]  ptcb            task control block pointor. If NULL, current task's
+ *  @param[in]  task            task control block pointor. If NULL, current task's
  *                              priority will be change.
  *  @param[in]  new_priority    new priority.
  *  @return     0               successfully.
@@ -329,7 +350,7 @@ void rtk_startup( void );
  *                                |
  *                         current priority
  */
-int task_priority_set( struct rtk_tcb *ptcb, unsigned int priority );
+int task_priority_set( struct rtk_task *task, unsigned int priority );
 
 
 /**
@@ -337,7 +358,7 @@ int task_priority_set( struct rtk_tcb *ptcb, unsigned int priority );
  *
  *  the task may be running or pending.
  */
-int task_terminate( struct rtk_tcb *ptcb );
+int task_terminate( struct rtk_task *task );
 
 /**
  *  @brief task delay
@@ -357,17 +378,17 @@ int task_unsafe( void );
 /**
  *  @brief current task name
  */
-#define CURRENT_TASK_NAME() (rtk_self()->name+0)
+#define CURRENT_TASK_NAME() (task_self()->name+0)
 
 /**
  *  @brief current task priority
  */
-#define CURRENT_TASK_PRIORITY() (rtk_self()->priority+0)
+#define CURRENT_TASK_PRIORITY() (task_self()->priority+0)
 
 /**
  *  @brief current task errno
  */
-#define CURRENT_TASK_ERR() (rtk_self()->err+0)
+#define CURRENT_TASK_ERR() (task_self()->err+0)
 
 /**
  *  @}
@@ -415,14 +436,14 @@ int task_unsafe( void );
 /**
  *  @brief semaphore binary declaration macro.
  */
-#define SEM_BINARY_DECL(name, init_value)  SEM_DECL(name)
-#define SEM_BINARY_DEF(name, init_value)  SEM_DECL(name, SEM_TYPE_BINARY, init_value)
+#define SEMB_DECL(name, init_value)  SEM_DECL(name)
+#define SEMB_DEF(name, init_value)   SEM_DECL(name, SEM_TYPE_BINARY, init_value)
 
 /**
  *  @brief semaphore counter declaration macro.
  */
-#define SEM_COUNT_DECL(name)   SEM_DECL(name)
-#define SEM_COUNT_DEF(name, init_value)   SEM_DECL(name, SEM_TYPE_COUNTER, init_value)
+#define SEMC_DECL(name)   SEM_DECL(name)
+#define SEMC_DEF(name, init_value)   SEM_DECL(name, SEM_TYPE_COUNTER, init_value)
 
 /**
  *  @brief mutex declaration macro.
@@ -764,7 +785,6 @@ void arch_interrupt_enable( int old );
 int  arch_interrupt_disable( void );
 void enter_int_context( void );
 void exit_int_context( void );
-int  kprintf ( const char* str, ... );
 
 extern int rtk_is_int_context;
 extern void schedule(void);
@@ -775,10 +795,9 @@ extern void schedule(void);
 
 #if CONFIG_TICK_DOWN_COUNTER_EN>0
 void rtk_tick_down_counter_init(struct rtk_tick *_this);
-int rtk_tick_down_counter_set_func( struct rtk_tick *_this, void (*func)(struct rtk_tick *) );
-int rtk_tick_down_counter_add( struct rtk_tick *_this, unsigned int tick );
-void rtk_tick_down_counter_remove ( struct rtk_tick *_this );
-void rtk_tick_down_counter_set( struct rtk_tick *_this, unsigned int tick );
+int rtk_tick_down_counter_set_func( struct rtk_tick *_this, void (*func)(void*), void*arg );
+void rtk_tick_down_counter_start( struct rtk_tick *_this, unsigned int tick );
+void rtk_tick_down_counter_stop ( struct rtk_tick *_this );
 #endif
 /**
  * @brief task list head
@@ -790,7 +809,7 @@ void rtk_tick_down_counter_set( struct rtk_tick *_this, unsigned int tick );
  *
  * @ATTENTION  you should NEVER modify it. 
  */
-extern struct rtk_tcb *rtk_self(void);
+extern struct rtk_task *task_self(void);
 
 
 /**

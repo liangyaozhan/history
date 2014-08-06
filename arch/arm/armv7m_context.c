@@ -47,7 +47,7 @@ extern long list_thread(void);
 void arch_hard_fault_exception( int lr )
 {
 	kprintf("hard fault on thread %s, terminated.\n", CURRENT_TASK_NAME());
-	task_terminate( ptcb_current );
+	task_terminate( task_current );
 }
 
 /**
