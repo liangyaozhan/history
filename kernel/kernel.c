@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-08-06 08:19:35, by lyzh>
+/* Last modified Time-stamp: <2014-08-08 07:37:30, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -42,6 +42,7 @@
 #define PLIST_PTR_TO_SEMID( ptr )       list_entry( (ptr), struct rtk_semaphore, pending_tasks )
 #define SEM_MEMBER_PTR_TO_SEMID( ptr )  list_entry( (ptr), struct rtk_mutex, sem_member_node )
 #define __task_detach_delay_counter(task) __rtk_tick_down_counter_remove( &task->tick_node );
+#define highest_task_get()             PRIO_NODE_TO_PTCB( g_readyq.phighest_node )
 
 #ifndef NULL
 #define NULL               ((void*)0)
@@ -115,7 +116,7 @@ static void           __release_one_mutex( struct rtk_mutex *semid, int err_code
 static int            __mutex_raise_owner_priority( struct rtk_mutex *semid, int priority );
 static int            __mutex_add_pending_task_trig( struct rtk_semaphore *semid, struct rtk_task *task );
 #endif
-static struct rtk_task*highest_tcb_get( void );
+static struct rtk_task*highest_task_loop_get( void );
 extern void           arch_context_switch(void **fromsp, void **tosp);
 extern void           arch_context_switch_interrupt(void **fromsp, void **tosp);
 void                  arch_context_switch_to(void **sp);
@@ -256,6 +257,32 @@ void task_delay( int tick )
 }
 
 
+/**
+ *  @brief     task_yield
+ *
+ *
+ *  note: idle task cannot call this function
+ *  @param  N/A
+ *  @return N/A. yield cpu.
+ */
+void task_yield( void )
+{
+    int old;
+    struct rtk_task *task_last;
+    struct rtk_task *task_current = task_self();
+
+    old = arch_interrupt_disable();
+    READY_Q_REMOVE( task_current );
+    task_last = task_current;
+    task_current = rtk_set_self( highest_task_get() );
+    if ( IS_INT_CONTEXT() ) {
+        arch_context_switch_interrupt( &task_last->sp, &task_current->sp );
+    } else {
+        arch_context_switch( &task_last->sp, &task_current->sp );
+    }
+    arch_interrupt_enable(old);
+}
+
 
 static void __task_pend_internal( struct rtk_task *task, unsigned int tick,
                                   int ( *task_wakeup)( struct rtk_task*, void * ),
@@ -298,7 +325,7 @@ void task_delay_timeout( struct rtk_tick *_this )
 }
 
 static
-struct rtk_task *highest_tcb_get( void )
+struct rtk_task *highest_task_loop_get( void )
 {
     struct rtk_task *task_current = task_self();
 
@@ -306,7 +333,7 @@ struct rtk_task *highest_tcb_get( void )
         READY_Q_REMOVE( task_current );
         READY_Q_PUT( task_current, task_current->current_priority );
     }
-    return PRIO_NODE_TO_PTCB( g_readyq.phighest_node );
+    return highest_task_get();
 }
 
 void rtk_startup( void )
@@ -425,6 +452,7 @@ int __sem_terminate( struct rtk_semaphore *semid )
     int               happen = 0;
 
     old = arch_interrupt_disable();
+    semid->type = SEM_TYPE_NULL;
     happen = __sem_wakeup_penders(semid, ENXIO, -1 );
     if ( happen ) {
         schedule_internel();
@@ -1336,7 +1364,7 @@ void schedule_internel( void )
 {
     struct rtk_task *p;
 
-    p = highest_tcb_get();
+    p = highest_task_loop_get();
     if ( p != rtk_task_current) {
         struct rtk_task *p_old;
         p_old = task_self();
@@ -1353,7 +1381,7 @@ void schedule( void )
 
     old = arch_interrupt_disable();
     task_last = task_current;
-    task_current = rtk_set_self( highest_tcb_get() );
+    task_current = rtk_set_self( highest_task_loop_get() );
     if ( task_current != task_last ) {
         if ( IS_INT_CONTEXT() ) {
             arch_context_switch_interrupt( &task_last->sp, &task_current->sp );

@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-08-06 08:18:58, by lyzh>
+/* Last modified Time-stamp: <2014-08-08 07:38:07, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -436,7 +436,7 @@ int task_unsafe( void );
 /**
  *  @brief semaphore binary declaration macro.
  */
-#define SEMB_DECL(name, init_value)  SEM_DECL(name)
+#define SEMB_DECL(name)  SEM_DECL(name)
 #define SEMB_DEF(name, init_value)   SEM_DECL(name, SEM_TYPE_BINARY, init_value)
 
 /**
@@ -811,6 +811,15 @@ void rtk_tick_down_counter_stop ( struct rtk_tick *_this );
  */
 extern struct rtk_task *task_self(void);
 
+/**
+ *  @brief     task_yield
+ *
+ *
+ *  note: idle task cannot call this function
+ *  @param  N/A
+ *  @return N/A. yield cpu.
+ */
+void task_yield( void );
 
 /**
  *  @}
