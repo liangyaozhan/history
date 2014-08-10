@@ -85,7 +85,7 @@ void mtask( void )
     int ret;
     
     while (1) {
-        task_priority_set(  tcbs[rand()%MAX_T], rand()%(MAX_PRIORITY-1) );
+        task_priority_set(  tcbs[rand()%MAX_T], ( rand()%rtk_max_priority() ) );
         size = rand()%100000;
         for (i=0; i<MAX_M; i++) {
             order[i] = i;
@@ -161,6 +161,10 @@ int rtk_sprintf( char *buff, const char* str, ... );
 void * fb_open( void );
 void *fb_back_get( void );void fb_flip( void );
 
+/* RTK_MAX_PRIORITY_DEF(8); */
+RTK_MAX_PRIORITY_DEF(1023);
+/* RTK_MAX_PRIORITY_DEF(255); */
+
 void main_task( void *pa, void *pb)
 {
     struct rtk_task      *task;
@@ -194,7 +198,7 @@ void main_task( void *pa, void *pb)
     semb_init( &sem, 0 );
 
     for (i = 0; i < MAX_T; i++) {
-        priority = rand()%(MAX_PRIORITY-1);
+        priority = rand()%rtk_max_priority();
         rtk_sprintf( name, "t%d-%d", i, priority );
         task = task_create(name, priority, 1024*32, 0, mtask, 1,2 );
         tcbs[i] = task;
@@ -207,7 +211,7 @@ void main_task( void *pa, void *pb)
         task_startup( tcbs[i] );
     }
     semb_terminate( &sem );
-    task_priority_set( NULL, MAX_PRIORITY );
+    task_priority_set( NULL, rtk_max_priority() );
     while (9) {
         color = rand();
         frame_buffer = fb_back_get();

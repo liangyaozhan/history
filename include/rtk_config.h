@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-08-06 07:38:05, by lyzh>
+/* Last modified Time-stamp: <2014-08-10 12:46:55, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -28,10 +28,6 @@
  * @{
  */
 
-/**
- * \brief priority number configuration
- */
-#define MAX_PRIORITY            255  /*!< must be <= 1023 and >=0 */
 
 /**
  *  \name API configuration macro

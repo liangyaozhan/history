@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-08-08 07:38:07, by lyzh>
+/* Last modified Time-stamp: <2014-08-10 13:07:28, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -825,6 +825,43 @@ void task_yield( void );
  *  @}
  */
 
+/**
+ *  @brief user never use this.
+ *
+ *  this is private structure.
+ */
+struct __priority_q_bitmap_head
+{
+    struct rtk_private_priority_q_node *phighest_node;
+    unsigned int                        bitmap_group;
+    unsigned int                        max_priority;
+    struct list_head                   *tasks;
+    uint32_t                            bitmap_tasks[1];
+};
+
+/**
+ *  @brief rtk max priority def
+ *
+ *  define rtk max priroty.
+ *  _max_priority can be 8~1023
+ */
+#define RTK_MAX_PRIORITY_DEF(_max_priority)                             \
+    struct __priority_q_bitmap_head_def                                 \
+    {                                                                   \
+        struct rtk_private_priority_q_node *phighest_node;              \
+        unsigned int                        bitmap_group;               \
+        unsigned int                        max_priority;               \
+        struct list_head                   *tasks;                      \
+        uint32_t                            bitmap_tasks[((_max_priority+1)&(32-1)) \
+                                                         ?((_max_priority+1)/32+1) \
+                                                         :((_max_priority+1)/32)]; \
+        struct list_head                    _tasks[_max_priority+1];    \
+    };                                                                  \
+    static struct __priority_q_bitmap_head_def __rtk_readyq;            \
+    static struct __priority_q_bitmap_head_def __rtk_readyq = {0,0,_max_priority,__rtk_readyq._tasks,}; \
+    struct __priority_q_bitmap_head *g_rtk_ready_q          = (struct __priority_q_bitmap_head*)&__rtk_readyq
+    
+unsigned int rtk_max_priority( void );
 
 /**
  *  @}

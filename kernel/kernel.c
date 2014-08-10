@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-08-08 07:37:30, by lyzh>
+/* Last modified Time-stamp: <2014-08-10 12:55:05, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
  * 
@@ -42,8 +42,10 @@
 #define PLIST_PTR_TO_SEMID( ptr )       list_entry( (ptr), struct rtk_semaphore, pending_tasks )
 #define SEM_MEMBER_PTR_TO_SEMID( ptr )  list_entry( (ptr), struct rtk_mutex, sem_member_node )
 #define __task_detach_delay_counter(task) __rtk_tick_down_counter_remove( &task->tick_node );
-#define highest_task_get()             PRIO_NODE_TO_PTCB( g_readyq.phighest_node )
-
+#define highest_task_get()             PRIO_NODE_TO_PTCB( the_readyq()->phighest_node )
+#define the_readyq()                  (g_rtk_ready_q)
+#define MAX_PRIORITY                    rtk_max_priority()
+    
 #ifndef NULL
 #define NULL               ((void*)0)
 #endif
@@ -59,27 +61,18 @@
 #undef int_min
 #define int_min(a, b) ((a)>(b)?(b):(a))
 
-#if ((MAX_PRIORITY+1)&(32-1))
-#define __MAX_GROUPS    ((MAX_PRIORITY+1)/32+1)
-#else
-#define __MAX_GROUPS    ((MAX_PRIORITY+1)/32)
-#endif
-
-typedef struct rtk_private_priority_q_node pqn_t;
-
-struct __priority_q_bitmap_head
-{
-    pqn_t            *phighest_node;
-    unsigned int      bitmap_group;
-    uint32_t          bitmap_tasks[__MAX_GROUPS];
-    struct list_head  tasks[MAX_PRIORITY+1];
-};
 typedef struct __priority_q_bitmap_head priority_q_bitmap_head_t;
+typedef struct rtk_private_priority_q_node pqn_t;
+extern struct __priority_q_bitmap_head *g_rtk_ready_q;
+
+unsigned int rtk_max_priority( void )
+{
+    return the_readyq()->max_priority;
+}
 
 /*********************************************************************************************************
  **  globle var
  ********************************************************************************************************/
-static priority_q_bitmap_head_t  g_readyq;
 static struct list_head          g_softtime_head;
 volatile unsigned long           g_systick;
 static struct rtk_task           *rtk_task_current;
@@ -147,18 +140,21 @@ inline static struct rtk_task *rtk_set_self(struct rtk_task *p)
 static
 void priority_q_init( void )
 {
-    priority_q_bitmap_head_t *pqriHead = &g_readyq;
-    int i;
+    priority_q_bitmap_head_t *pqriHead = the_readyq();
+    unsigned int              m        = rtk_max_priority();
+    unsigned int              i;
+    int                       n;
 
     pqriHead->phighest_node = NULL;
 
     pqriHead->bitmap_group = 0;
+    n = ((m+1)&(32-1))?((m+1)/32+1):((m+1)/32);
 
-    for (i = 0; i < sizeof(pqriHead->bitmap_tasks)/sizeof(pqriHead->bitmap_tasks[0]); i++) {
+    for (i = 0; i<n; i++) {
         pqriHead->bitmap_tasks[i] = 0;
     }
 
-    for (i = 0; i <= MAX_PRIORITY; i++) {
+    for (i = 0; i<=m; i++) {
         INIT_LIST_HEAD( &pqriHead->tasks[i] );
     }
 }
@@ -200,7 +196,7 @@ pqn_t *priority_q_highest_get( priority_q_bitmap_head_t *pqHead )
 
 int priority_q_put( pqn_t *_this, int key )
 {
-    register priority_q_bitmap_head_t *pqHead = &g_readyq;
+    register priority_q_bitmap_head_t *pqHead = the_readyq();
 
     /* cannot put more than once time, but, if key not the same, we change it.  */
     if ( unlikely(!list_empty(&_this->node)) ) {
@@ -225,7 +221,7 @@ int priority_q_put( pqn_t *_this, int key )
 
 int priority_q_remove( pqn_t *_this )
 {
-    register priority_q_bitmap_head_t *pqHead = &g_readyq;
+    register priority_q_bitmap_head_t *pqHead = the_readyq();
     int key;
     
     key = _this->key;
@@ -267,7 +263,7 @@ void task_delay( int tick )
  */
 void task_yield( void )
 {
-    int old;
+    int              old;
     struct rtk_task *task_last;
     struct rtk_task *task_current = task_self();
 
@@ -338,7 +334,7 @@ struct rtk_task *highest_task_loop_get( void )
 
 void rtk_startup( void )
 {
-    struct rtk_task *task = PRIO_NODE_TO_PTCB( g_readyq.phighest_node );
+    struct rtk_task *task = highest_task_get();
     rtk_set_self( task );
     arch_context_switch_to(&task->sp);
 }
@@ -1416,7 +1412,7 @@ void task_exit( void )
         __release_one_mutex( psemid, ENXIO );
     }
 #endif
-    task = PRIO_NODE_TO_PTCB( g_readyq.phighest_node );
+    task = highest_task_get();
     rtk_set_self(  task );
     arch_context_switch_to(&task->sp);
 }
