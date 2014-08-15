@@ -1,21 +1,25 @@
 
 /****************************************************************************/
-.global set_irq_stack
-.global set_fiq_stack
-.global set_undefine_stack
-.global set_abort_stack
+.code 32
 
-.global _irqhandle
-.global _data_abort
-.global _prefetch_abort
-.global _undefined_instruction
-.global _software_interrupt
+#if __thumb__
+# define FUNC(name) .type name, %function; .thumb_func; name:
+# define SET .thumb_set
+#else
+# define FUNC(name) .type name, %function; name:
+# define SET .set
+#endif
+#define GLOBAL(name) .global name; FUNC(name)
+#define SIZE(name) .size name, .-name
+#define FUNC_BEGIN(name) GLOBAL(## name)
+#define FUNC_END(name) SIZE(## name)
+		
 /****************************************************************************/
 
 #define NOINT			0xc0
     
 /****************************************************************************/    
-set_irq_stack:
+FUNC_BEGIN(set_irq_stack)
 	/* irq */
 	mrs	r1,cpsr
 	mov r2, r1 /* save old mode to r2 */
@@ -26,10 +30,11 @@ set_irq_stack:
     
     /* switch back to old mode saved in r2 */
 	msr	cpsr,r2
-	mov pc, lr
-
+	bx lr
+FUNC_END(set_irq_stack)
 		
-set_fiq_stack:
+		
+FUNC_BEGIN(set_fiq_stack)
 	/* fiq */
 	mrs	r1,cpsr
 	mov r2, r1 /* save old mode to r2 */
@@ -39,10 +44,11 @@ set_fiq_stack:
 	mov sp, r0
 	/* switch back to old mode saved in r2 */
 	msr	cpsr,r2
-	mov pc, lr
-    
+	bx lr
+FUNC_END(set_fiq_stack)
+		
 /****************************************************************************/    
-set_undefine_stack:
+FUNC_BEGIN(set_undefine_stack)
 		/* undef */
 	mrs	r1,cpsr
 	mov r2, r1 /* save old mode to r2 */
@@ -52,10 +58,11 @@ set_undefine_stack:
 	mov sp, r0
 	/* switch back to old mode saved in r2 */
 	msr	cpsr,r2
-	mov pc, lr
+	bx lr
+FUNC_END(set_undefine_stack)
     
 /****************************************************************************/    		
-set_abort_stack:
+FUNC_BEGIN(set_abort_stack)
 	/* abort */
 	mrs	r1,cpsr
 	mov r2, r1 /* save old mode to r2 */
@@ -65,18 +72,18 @@ set_abort_stack:
 	mov sp, r0
 	/* switch back to old mode saved in r2 */
 	msr	cpsr,r2
-	mov pc, lr
+	bx lr
+FUNC_END(set_abort_stack)
     
 /****************************************************************************/    
-.globl 		rt_interrupt_enter
-.globl 		rt_interrupt_leave
 .globl 		rt_thread_switch_interrupt_flag
 .globl 		rt_interrupt_from_thread
 .globl 		rt_interrupt_to_thread
-_irqhandle:
+FUNC_BEGIN(_irqhandle)
 	stmfd	sp!, {r0-r12,lr}
 /*	bl		rt_interrupt_enter */
-	bl		irq_handle
+	ldr r0,_irq_handle
+    bx  r0
 /*	bl		rt_interrupt_leave */
 
 	/* if rt_thread_switch_interrupt_flag set, jump to _interrupt_thread_switch and don't return */
@@ -86,10 +93,15 @@ _irqhandle:
 	beq		_interrupt_thread_switch
 
 	ldmfd	sp!, {r0-r12,lr}
-	subs	pc, lr, #4
+	/*subs	pc, lr, #4*/
+	subs	lr, lr, #4
+    bx lr
+_irq_handle:
+    .word irq_handle
+FUNC_END(_irqhandle)
 
-
-_interrupt_thread_switch:
+		
+FUNC_BEGIN(_interrupt_thread_switch)
 	mov		r1,  #0					/* clear rt_thread_switch_interrupt_flag*/
 	str		r1,  [r0]
 
@@ -130,10 +142,11 @@ _interrupt_thread_switch:
 	msr		CPSR_cxsf, r4
 
 	ldmfd	sp!, {r0-r12,lr,pc}		/* pop new task's r0-r12,lr & pc	*/
+FUNC_END(_interrupt_thread_switch)
 
-
+		
 /****************************************************************************/    
-_data_abort:
+FUNC_BEGIN(_data_abort)
     stmfd SP!, {R0-R3}
 
     /*
@@ -221,9 +234,10 @@ _data_abort:
 
     MSR CPSR, R3
     LDMFD SP!,{R0-R3, LR, PC}
+FUNC_END(_data_abort)
 
 /****************************************************************************/
-_prefetch_abort:
+FUNC_BEGIN(_prefetch_abort)
     stmfd SP!, {R0-R3}
 
     /*
@@ -311,10 +325,10 @@ _prefetch_abort:
 
     MSR CPSR, R3
     LDMFD SP!,{R0-R3, LR, PC}
-
+FUNC_END(_prefetch_abort)
 
 /****************************************************************************/
-_undefined_instruction: 
+FUNC_BEGIN(_undefined_instruction)
         stmfd SP!, {R0-R3}
 
     /*
@@ -402,11 +416,11 @@ _undefined_instruction:
 
     MSR CPSR, R3
     LDMFD SP!,{R0-R3, LR, PC}
-
+FUNC_END(_undefined_instruction)
     
 
 /****************************************************************************/
-_software_interrupt: 
+FUNC_BEGIN(_software_interrupt)
         stmfd SP!, {R0-R3}
 
     /*
@@ -494,4 +508,6 @@ _software_interrupt:
 
     MSR CPSR, R3
     LDMFD SP!,{R0-R3, LR, PC}
+FUNC_END(_software_interrupt)
 
+		

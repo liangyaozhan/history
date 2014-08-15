@@ -10,7 +10,8 @@
 
 .globl main
 .globl _start
-
+.code 32 
+		
 .global vectorTable
 .global UndefinedInstruction
 .global SoftwareInterrupt
@@ -130,8 +131,24 @@ clbss_l:str    r2, [r0]        /* clear loop...                    */
     cmp    r0, r1
     blt    clbss_l
 
+			/* call C++ constructors of global objects 							*/
+/*	ldr 	r0, =__ctors_start__
+	ldr 	r1, =__ctors_end__
+	
+ctor_loop:
+	cmp 	r0, r1
+	beq 	ctor_end
+	ldr 	r2, [r0], #4
+	stmfd 	sp!, {r0-r1}
+	mov 	lr, pc
+	bx 		r2
+	ldmfd 	sp!, {r0-r1}
+	b		ctor_loop
 
-    ldr pc,__main
+ctor_end:*/
+		
+    ldr r0,__main
+	bx  r0
 __main:
     .word main
 /*

@@ -1,6 +1,20 @@
 
 #define MB   (0x100000)
-		
+
+.code 32
+
+#if __thumb__
+# define FUNC(name) .type name, %function; .thumb_func; name:
+# define SET .thumb_set
+#else
+# define FUNC(name) .type name, %function; name:
+# define SET .set
+#endif
+#define GLOBAL(name) .global name; FUNC(name)
+#define SIZE(name) .size name, .-name
+#define FUNC_BEGIN(name) GLOBAL(## name)
+#define FUNC_END(name) SIZE(## name)
+
 /*======================================================================
   MMU Control register initial value
 ======================================================================*/
@@ -38,10 +52,7 @@
  *
  *************************************************************************
  */
-.globl enable_mmu
-.text
-.balign 4
-enable_mmu:
+FUNC_BEGIN(enable_mmu)
     /*
      * Set processor and MMU to known state as follows (we may have not
      * been entered from a reset). We must do this before setting the CPU
@@ -121,8 +132,8 @@ enable_mmu:
     bl mmuSetup  /* startup MMU */
 
 	mov	lr, ip
-    mov	pc, lr /* return to _start() */		
-
+    bx lr /* return to _start() */		
+FUNC_END(enable_mmu)
 
 __arm_mmu_table_setup:
 	.word arm_mmu_table_setup
@@ -159,7 +170,7 @@ __arm_mmu_table_setup:
 #define L2_PAGE_TABLE_ADDR     L1_PAGE_TABLE_ADDR + L1_PAGE_TABLE_SIZE
 #define L2_PAGE_TABLE_SIZE     SZ_4K
 
-mmuSetup:
+FUNC_BEGIN(mmuSetup)
 /* 
  * Set Translation Table Base 
  */
@@ -216,11 +227,10 @@ mmuSetup:
         mcr     p15, 0, r0, c1, c0, 0                                   /* Write Back                   */
         
 		mov     pc,lr
+FUNC_END(mmuSetup)
 
-.globl disable_mmu
-.text
-.balign 4
-disable_mmu:
+		
+FUNC_BEGIN(disable_mmu)
 	 push {r0, r1}
     /*
      * clean and invalidate D-CACHE
@@ -267,8 +277,8 @@ disable_mmu:
 	mcr	p15, 0, r0, c1, c0, 0
 
 	pop {r0, r1}
-	mov	pc, lr
-
+	bx lr
+FUNC_END(disable_mmu)
 		
 /*==============================================================================
 ** FILE END
