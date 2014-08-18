@@ -14,7 +14,7 @@ LDFLAGS += -Xlinker --gc-sections
 #LDFLAGS +=  -mthumb
 #print removed sections : -Xlinker --print-gc-sections
 #LDFLAGS += -Xlinker --print-gc-sections
-#
+
 #CFLAGS +=  -mthumb -mthumb-interwork 
 # select only one of these two.
 #CONFIG_SMALL_MEMLIB := y

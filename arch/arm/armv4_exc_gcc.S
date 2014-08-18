@@ -83,6 +83,7 @@ FUNC_BEGIN(_irqhandle)
 	stmfd	sp!, {r0-r12,lr}
 /*	bl		rt_interrupt_enter */
 	ldr r0,_irq_handle
+    mov lr, pc
     bx  r0
 /*	bl		rt_interrupt_leave */
 
@@ -93,15 +94,13 @@ FUNC_BEGIN(_irqhandle)
 	beq		_interrupt_thread_switch
 
 	ldmfd	sp!, {r0-r12,lr}
-	/*subs	pc, lr, #4*/
-	subs	lr, lr, #4
-    bx lr
+	subs	pc, lr, #4
 _irq_handle:
     .word irq_handle
 FUNC_END(_irqhandle)
 
 		
-FUNC_BEGIN(_interrupt_thread_switch)
+_interrupt_thread_switch:
 	mov		r1,  #0					/* clear rt_thread_switch_interrupt_flag*/
 	str		r1,  [r0]
 
@@ -141,8 +140,7 @@ FUNC_BEGIN(_interrupt_thread_switch)
 	ldmfd	sp!, {r4}				/* pop new task's psr				*/
 	msr		CPSR_cxsf, r4
 
-	ldmfd	sp!, {r0-r12,lr,pc}		/* pop new task's r0-r12,lr & pc	*/
-FUNC_END(_interrupt_thread_switch)
+	ldmfd	sp!, {r0-r12,lr,pc}    /* pop new task's r0-r12,lr & pc	*/
 
 		
 /****************************************************************************/    

@@ -1,10 +1,6 @@
 
 
-#if __thumb__
-#define STATUS_REG_INIT_VALUE   ( 0x53|0x20 )
-#else
 #define STATUS_REG_INIT_VALUE   ( 0x53 )
-#endif
 
 #define ROUND_DOWN(p, d)        (((int)p - ((d)-1)) & (~(d-1)))
 #ifndef ROUND_UP
@@ -38,7 +34,11 @@ unsigned char *arch_stack_init(void *tentry, void *a, void *b,
     *p-- = b;                  /* r1: arg1 of function task_entry_exit */
     *p-- = a;                  /* r0: arg0 of function task_entry_exit */
     *p-- = STATUS_REG_INIT_VALUE; /* cpsr */
+#if __thumb__
     *p = STATUS_REG_INIT_VALUE; /* spsr */
+#else
+    *p = STATUS_REG_INIT_VALUE; /* spsr */
+#endif
     /*
      *  full stack pointer
      */
