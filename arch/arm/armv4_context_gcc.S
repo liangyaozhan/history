@@ -55,7 +55,7 @@ FUNC_BEGIN(arch_context_switch)
 	ldmfd	sp!, {r4}		@ pop new task cpsr
 	msr	cpsr_cxsf, r4
 
-	ldmfd	sp!, {r0-r12, lr, pc}^	@ pop new task r0-r12, lr & pc
+	ldmfd	sp!, {r0-r12, lr, pc}	@ pop new task r0-r12, lr & pc
 FUNC_END(arch_context_switch)
 		
 /*

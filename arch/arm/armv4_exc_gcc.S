@@ -13,6 +13,8 @@
 #define SIZE(name) .size name, .-name
 #define FUNC_BEGIN(name) GLOBAL(## name)
 #define FUNC_END(name) SIZE(## name)
+#define ARM_FUNC_BEGIN(name) .global name ;.type name, %function; name:
+#define ARM_FUNC_END(name) SIZE(## name)
 		
 /****************************************************************************/
 
@@ -79,7 +81,7 @@ FUNC_END(set_abort_stack)
 .globl 		rt_thread_switch_interrupt_flag
 .globl 		rt_interrupt_from_thread
 .globl 		rt_interrupt_to_thread
-FUNC_BEGIN(_irqhandle)
+ARM_FUNC_BEGIN(_irqhandle)
 	stmfd	sp!, {r0-r12,lr}
 /*	bl		rt_interrupt_enter */
 	ldr r0,_irq_handle
@@ -97,7 +99,7 @@ FUNC_BEGIN(_irqhandle)
 	subs	pc, lr, #4
 _irq_handle:
     .word irq_handle
-FUNC_END(_irqhandle)
+ARM_FUNC_END(_irqhandle)
 
 		
 _interrupt_thread_switch:
@@ -140,7 +142,7 @@ _interrupt_thread_switch:
 	ldmfd	sp!, {r4}				/* pop new task's psr				*/
 	msr		CPSR_cxsf, r4
 
-	ldmfd	sp!, {r0-r12,lr,pc}    /* pop new task's r0-r12,lr & pc	*/
+	ldmfd	sp!, {r0-r12,lr,pc}^    /* pop new task's r0-r12,lr & pc	*/
 
 		
 /****************************************************************************/    
