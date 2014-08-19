@@ -11,12 +11,13 @@ COMMON_FLAGS += -DMEM_STATS
 LDFLAGS += -Wl,--start-group -lgcc -Wl,--end-group
 # remove unused sections: -Xlinker --gc-sections
 LDFLAGS += -Xlinker --gc-sections
-LDFLAGS +=  -mthumb
 #print removed sections : -Xlinker --print-gc-sections
 #LDFLAGS += -Xlinker --print-gc-sections
 
+LDFLAGS +=  -mthumb
 CFLAGS +=  -mthumb
 COMMON_FLAGS +=  -mthumb-interwork 
+COMMON_FLAGS +=  -DRTK_THUMB_EN=1
 
 # select only one of these two.
 #CONFIG_SMALL_MEMLIB := y

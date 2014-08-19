@@ -111,12 +111,6 @@ swtich_to_thread:
 	LDMFD	R1!, {R4 - R11}			/* pop R4 - R11 register */
 	MSR		PSP, R1					/* update stack pointer */
 
-    /* MOV     R1, LR  */  /* save LR, quick way but, it is not safe if set_ptcb_current function modify R1 */
-    push {LR}   /* a safe way to save LR */
-    /* set ptcb_current R0 is &ptcb_current->sp */
-    BL      set_ptcb_current
-    pop {LR}
-    /* MOV     LR, R1 */  /* restore LR */
     
 pendsv_exit:
 	/* restore interrupt */

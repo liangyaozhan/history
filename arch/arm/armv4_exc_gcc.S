@@ -114,6 +114,7 @@ _interrupt_thread_switch:
 	
 	mrs		r3,  spsr				/* disable interrupt				*/
 	orr		r0,  r3, #NOINT
+	bic		r0,  r0, #0x20         /* clear thumb mode                  */
 	msr		spsr_c, r0
 
 	ldr		r0,  =.+8				/* switch to interrupted task's stack*/
@@ -125,9 +126,12 @@ _interrupt_thread_switch:
 	mov		r5,  r3
 	ldmfd	r4!, {r0-r3}
 	stmfd	sp!, {r0-r3}			/* push old task's r3-r0			*/
+#if RTK_THUMB_EN
+	and lr,lr,#0x00000001
+	cmp	lr, #1
+	orreq r5,r5, #0x20 /* for thumb mode */
+#endif
 	stmfd	sp!, {r5}				/* push old task's psr				*/
-	mrs		r4,  spsr
-	stmfd	sp!, {r4}				/* push old task's spsr				*/
 
 	ldr		r4,  =rt_interrupt_from_thread
 	ldr		r5,  [r4]
@@ -139,8 +143,6 @@ _interrupt_thread_switch:
 
 	ldmfd	sp!, {r4}				/* pop new task's spsr				*/
 	msr		SPSR_cxsf, r4
-	ldmfd	sp!, {r4}				/* pop new task's psr				*/
-	msr		CPSR_cxsf, r4
 
 	ldmfd	sp!, {r0-r12,lr,pc}^    /* pop new task's r0-r12,lr & pc	*/
 

@@ -43,19 +43,19 @@ FUNC_BEGIN(arch_context_switch)
 	stmfd	sp!, {r0-r12, lr}	@ push lr & register file
 
 	mrs	r4, cpsr
+#if RTK_THUMB_EN
+	and lr,lr,#0x00000001
+	cmp	lr, #1
+	orreq r4,r4, #0x20 /* for thumb mode */
+#endif
 	stmfd	sp!, {r4}		@ push cpsr
-	mrs	r4, spsr
-	stmfd	sp!, {r4}		@ push spsr
 
 	str	sp, [r0]		@ store sp in preempted tasks TCB
 	ldr	sp, [r1]		@ get new task stack pointer
 
 	ldmfd	sp!, {r4}		@ pop new task spsr
 	msr	spsr_cxsf, r4
-	ldmfd	sp!, {r4}		@ pop new task cpsr
-	msr	cpsr_cxsf, r4
-
-	ldmfd	sp!, {r0-r12, lr, pc}	@ pop new task r0-r12, lr & pc
+	ldmfd	sp!, {r0-r12, lr, pc}^	@ pop new task r0-r12, lr & pc
 FUNC_END(arch_context_switch)
 		
 /*
@@ -67,10 +67,8 @@ FUNC_BEGIN(arch_context_switch_to)
 
 	ldmfd	sp!, {r4}		@ pop new task spsr
 	msr	spsr_cxsf, r4
-	ldmfd	sp!, {r4}		@ pop new task cpsr
-	msr	cpsr_cxsf, r4
 
-	ldmfd	sp!, {r0-r12, lr, pc}	@ pop new task r0-r12, lr & pc
+	ldmfd	sp!, {r0-r12, lr, pc}^	@ pop new task r0-r12, lr & pc
 FUNC_END(arch_context_switch_to)
 
 /*
