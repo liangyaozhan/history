@@ -1,6 +1,6 @@
 /* Last modified Time-stamp: <2014-08-10 12:55:05, by lyzh>
  * 
- * Copyright (C) 2012 liangyaozhan <ivws02@gmail.com>
+ * Copyright (C) 2012 liangyaozhan <ivws02@126.com>
  * 
  *
  * This program is free software; you can redistribute it and/or modify
@@ -271,6 +271,7 @@ void task_yield( void )
     READY_Q_REMOVE( task_current );
     task_last = task_current;
     task_current = rtk_set_self( highest_task_get() );
+    READY_Q_PUT(task_last, task_last->priority );
     if ( IS_INT_CONTEXT() ) {
         arch_context_switch_interrupt( &task_last->sp, &task_current->sp );
     } else {
@@ -1273,6 +1274,7 @@ int task_startup( struct rtk_task *task )
         return -EPERM;
     }
 
+
     list_add_tail( &task->task_list_node, &g_systerm_tasks_head );
     READY_Q_PUT( task, task->current_priority );
     task->status = TASK_READY;
@@ -1343,7 +1345,9 @@ int task_terminate( struct rtk_task *task )
         __release_one_mutex( psemid, ENXIO );
     }
 #endif
-
+#if CONFIG_SEMB_EN||CONFIG_SEMC_EN
+    __task_detach_pending_sem(task);
+#endif
     READY_Q_REMOVE( task );
     list_del_init( &task->task_list_node );
     task->status = TASK_DEAD;
