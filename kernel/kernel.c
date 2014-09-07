@@ -1,4 +1,4 @@
-/* Last modified Time-stamp: <2014-08-10 12:55:05, by lyzh>
+/* Last modified Time-stamp: <2014-09-03 23:43:27, by lyzh>
  * 
  * Copyright (C) 2012 liangyaozhan <ivws02@126.com>
  * 
@@ -106,7 +106,7 @@ static void           __task_pend_internal( struct rtk_task *task, unsigned int 
                                             int ( *task_wakeup)( struct rtk_task*, void * ),
                                             void *arg );
 static void           __release_one_mutex( struct rtk_mutex *semid, int err_code );
-static int            __mutex_raise_owner_priority( struct rtk_mutex *semid, int priority );
+static int            __mutex_raise_owner_priority( struct rtk_mutex *semid );
 static int            __mutex_add_pending_task_trig( struct rtk_semaphore *semid, struct rtk_task *task );
 #endif
 static struct rtk_task*highest_task_loop_get( void );
@@ -271,7 +271,7 @@ void task_yield( void )
     READY_Q_REMOVE( task_current );
     task_last = task_current;
     task_current = rtk_set_self( highest_task_get() );
-    READY_Q_PUT(task_last, task_last->priority );
+    READY_Q_PUT(task_last, task_last->current_priority );
     if ( IS_INT_CONTEXT() ) {
         arch_context_switch_interrupt( &task_last->sp, &task_current->sp );
     } else {
@@ -808,7 +808,7 @@ int mutex_lock( struct rtk_mutex *semid, unsigned int tick )
      *  put tcb into pend list and inherit priority.
      */
     if ( __mutex_add_pending_task_trig( &semid->s, task_current ) ) {
-        __mutex_raise_owner_priority( semid, task_current->current_priority );
+        __mutex_raise_owner_priority( semid );
     }
     __task_pend_internal( task_current, tick, __mutex_task_wakeup, semid );
     arch_interrupt_enable( old );
@@ -1077,10 +1077,11 @@ int __mutex_add_pending_task_trig( struct rtk_semaphore *semid, struct rtk_task 
 }
 
 static
-int __mutex_raise_owner_priority( struct rtk_mutex *semid, int priority )
+int __mutex_raise_owner_priority( struct rtk_mutex *semid )
 {
     int ret = 0;
     struct rtk_task *powner;
+    int priority = __sem_pend_list_priority_get((struct rtk_semaphore*)semid);
     powner   = semid->s.u.owner;
 
 again:
@@ -1200,7 +1201,7 @@ int task_priority_set( struct rtk_task *task, unsigned int priority )
         trig = __sem_resort_pend_list_trig( (struct rtk_semaphore*)semid, task );
 #if CONFIG_MUTEX_EN
         if ( trig && semid->type == SEM_TYPE_MUTEX ) {
-            need = __mutex_raise_owner_priority( (struct rtk_mutex*)semid, task->current_priority );
+            need = __mutex_raise_owner_priority( (struct rtk_mutex*)semid );
         }
 #else
         (void)trig;

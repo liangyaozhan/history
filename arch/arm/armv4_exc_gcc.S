@@ -123,14 +123,15 @@ _interrupt_thread_switch:
 	stmfd	sp!, {r2}				/* push old task's pc				*/
 	stmfd	sp!, {r4-r12,lr}		/* push old task's lr,r12-r4		*/
 	mov		r4,  r1					/* Special optimised code below		*/
-	mov		r5,  r3
+	mov		r5,  r3              /* old task's cpsr */
+	mov    r6,  r2              /* R6: old task's return address */
 	ldmfd	r4!, {r0-r3}
 	stmfd	sp!, {r0-r3}			/* push old task's r3-r0			*/
-#if RTK_THUMB_EN
-	and lr,lr,#0x00000001
-	cmp	lr, #1
+
+	and r6,r6,#0x00000001
+	cmp	r6, #1
 	orreq r5,r5, #0x20 /* for thumb mode */
-#endif
+
 	stmfd	sp!, {r5}				/* push old task's psr				*/
 
 	ldr		r4,  =rt_interrupt_from_thread
@@ -494,7 +495,7 @@ FUNC_BEGIN(_software_interrupt)
 	 * interrupting address.
 	 */
     MOV R0,LR
-    BL    software_interrupt
+    /*BL    software_interrupt*/
 
     /*
      * after irq_handle, irq must be disabled.

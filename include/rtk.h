@@ -798,6 +798,7 @@ void rtk_tick_down_counter_init(struct rtk_tick *_this);
 int rtk_tick_down_counter_set_func( struct rtk_tick *_this, void (*func)(void*), void*arg );
 void rtk_tick_down_counter_start( struct rtk_tick *_this, unsigned int tick );
 void rtk_tick_down_counter_stop ( struct rtk_tick *_this );
+void rtk_tick_down_counter_announce( void );
 #endif
 /**
  * @brief task list head
