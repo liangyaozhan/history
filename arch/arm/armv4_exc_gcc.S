@@ -114,7 +114,7 @@ _interrupt_thread_switch:
 	
 	mrs		r3,  spsr				/* disable interrupt				*/
 	orr		r0,  r3, #NOINT
-	bic		r0,  r0, #0x20         /* clear thumb mode                  */
+	bic		r0,  r0, #0x20       /* clear thumb mode   */
 	msr		spsr_c, r0
 
 	ldr		r0,  =.+8				/* switch to interrupted task's stack*/

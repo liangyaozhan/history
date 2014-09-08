@@ -86,6 +86,7 @@ extern int rtk_ffs( register unsigned int q );
 
 
 void *memcpy(void*,const void*,int);
+void *memset( void*,int, unsigned int );
 static inline void    __sem_add_pending_task( struct rtk_semaphore *semid, struct rtk_task *task );
 static inline void    __task_detach_pending_sem( struct rtk_task *task );
 static inline int     __sem_pend_list_priority_get ( struct rtk_semaphore *semid );
@@ -1250,6 +1251,7 @@ struct rtk_task *task_init(struct rtk_task *task,
     task->safe_count       = 0;
 #endif
 
+    memset( stack_low, 0x55, stack_high-stack_low+1 );
     task->sp = arch_stack_init( pfunc, arg1, arg2, stack_low, stack_high, task_exit );
     INIT_LIST_HEAD( &task->prio_node.node );
     INIT_LIST_HEAD( &task->sem_node );

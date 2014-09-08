@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Time-stamp: <2012-08-16 09:41:35 Thursday by ubuntu>
+# Time-stamp: <2014-08-27 19:10:15, by lyzh>
 # encoding: utf-8-unix (alias: mule-utf-8-unix)
 # @version 1.0
 # @author liangyaozhan
@@ -56,10 +56,6 @@ cat << EOF >$symbolc
 #undef malloc
 #undef free
 
-#ifndef SYM_TABLE_SIZE
-#define SYM_TABLE_SIZE   `wc $funcfile $objsfile_b $objsfile_d $objsfile_r $objsfile_s $objsfile_c $objsfile_w $objsfile_v -l | sed -n 's/\ *\([0-9]*\)\ total/\1/pg'`
-#endif
-
 #define SYMBOL_ITEM_FUNC(sym)   {sym, SYM_TEXT, #sym },
 #define SYMBOL_ITEM_OBJ(sym)   {&sym, SYM_DATA, #sym },
 
@@ -99,9 +95,10 @@ cat << EOF >>$symbolc
 
 int __static_sym_get( sym_t **ppsym, int *pcount )
 {
+    int n = sizeof(__g_sym_static)/sizeof(__g_sym_static[0]);
     *ppsym  = __g_sym_static;
-    *pcount = SYM_TABLE_SIZE;
-    return -!SYM_TABLE_SIZE;
+    *pcount = n;
+    return -!n;
 }
 
 EOF

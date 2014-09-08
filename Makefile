@@ -66,7 +66,7 @@ EX_CLEAN_FILE +=
 # 
 
 #EXCLUDE_SUB_PATH:=
-ALL_SUB_PATH:= bsp arch kernel  libs
+ALL_SUB_PATH:= arch kernel  libs
 
 
 ifeq ($(findstring clean,$(MAKECMDGOALS)),clean)
@@ -88,4 +88,4 @@ pre_building:
 
 # 在编译OBJS和子目录后，可以使用此目标完成一些工作，可以写在某个目录的dircfg.mk中
 post_building:
-	make -C app
+#	make -C app

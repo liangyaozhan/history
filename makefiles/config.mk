@@ -14,6 +14,7 @@ ARMARCH  ?= armv4
 
 #CPU     ?= arm926ej-s
 #BSP_NAME ?= lpc3250
+#ARMARCH  ?= armv4
 
 #CPU     ?=cortex-m3
 #BSP_NAME ?=stm32f10x
@@ -23,8 +24,8 @@ include $(RTK_BASE)/cfg/$(BSP_NAME)-cfg.mk
 
 # 版本定义:debug 或者 release. 默认是debug
 # debug版带调试信息,release 不带调试信息
-#VERSION ?= debug
-VERSION ?= release
+VERSION ?= debug
+#VERSION ?= release
 
 # 默认库名字
 DEFAULT_LIB_NAME:=librtk.a

@@ -1,5 +1,16 @@
 # -*- coding: gb2312; -*- 
-## 
+#########################################################################################################
+##
+##                                    中国软件开源组织
+##
+##                                   嵌入式实时操作系统
+##
+##                                SylixOS(TM)  LW : long wing
+##
+##                               Copyright All Rights Reserved
+##
+##--------------文件信息--------------------------------------------------------------------------------
+##
 ## 文   件   名: makefiletemplate.mk
 ##
 ## 创   建   人: liangyaozhan
@@ -16,13 +27,13 @@
 #auto search base directory
 # shell cmd:
 # d=`pwd`; while [ ! -d $d/makefiles ]; do d=`dirname $d` ; done ; echo $d
-ifeq ($(RTK_BASE),)
-RTK_BASE := $(shell d=`pwd`; while [ ! -d $$d/makefiles ]; do d=`dirname $$d` ; done ; echo $$d)
-export RTK_BASE
+ifeq ($(PPOS_BASE),)
+PPOS_BASE := $(shell d=`pwd`; while [ ! -d $$d/makefiles ]; do d=`dirname $$d` ; done ; echo $$d)
+export PPOS_BASE
 endif
 
 #in case we are on a WIN32 host ...
-RTK_BASE := $(subst \,/,$(RTK_BASE))
+SYLIXOS_BASE := $(subst \,/,$(PPOS_BASE))
 
 # 确保第一个目标是all
 all:pre_building
@@ -30,7 +41,7 @@ all:pre_building
 Makefile:;
 
 # 在定义目标文件之前需要包含一些定义，如：CPU
-include $(RTK_BASE)/makefiles/config.mk
+include $(PPOS_BASE)/makefiles/config.mk
 
 #编译到$(MODULE_NAME)的目标文件
 COBJS   := $(patsubst %.c,%.o,$(wildcard *.c)) 
@@ -54,19 +65,17 @@ INC_PATH +=
 EX_CLEAN_FILE += 
 
 # 可指定子目录.若不定义此变量(需要把它注释)，则所有子目录都编译.
-# 注意：需要在"sinclude $(RTK_BASE)/makefiles/rules.mk"之前定义此变量
+# 注意：需要在"sinclude $(PPOS_BASE)/makefiles/rules.mk"之前定义此变量
 #ALL_SUB_PATH = subdir1 subdir2 subdir3
-# 当子目录的编译顺序重要时，可以在文件的后面(在"sinclude $(RTK_BASE)/makefiles/rules.mk"之后)
+# 当子目录的编译顺序重要时，可以在文件的后面(在"sinclude $(PPOS_BASE)/makefiles/rules.mk"之后)
 # 指定子目录的依赖关系，进而确定他们之间的编译顺序。
 # 如： 当目录subdir1,subdir2,subdir3的编译顺序需求： subdir1 ==> subdir2 ==> subdir3
 #     则在此文件加上依赖关系：
 #         subdir3:subdir2
 #         subdir2:subdir1
 # 可以写在当前目录的dircfg.mk
-#
-ALL_SUB_PATH:=$(BSP_NAME)
-
-#EXCLUDE_SUB_PATH:=
+# 
+ALL_SUB_PATH :=$(BSP_NAME)
 
 # 如果可能，则包含当前目录下的配置文件
 -include ./dircfg.mk
@@ -74,7 +83,7 @@ ALL_SUB_PATH:=$(BSP_NAME)
 #
 # 包括模块(库)的生成规则
 # 
-sinclude $(RTK_BASE)/makefiles/rules.mk
+sinclude $(PPOS_BASE)/makefiles/rules.mk
 
 # 在编译OBJS和子目录前，可以使用此目标完成一些工作，可以写在某个目录的dircfg.mk中
 pre_building:

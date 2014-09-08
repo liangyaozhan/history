@@ -1,0 +1,101 @@
+
+
+target remote localhost:3333
+
+
+
+InitStep0_Action = "Reset"
+InitStep0_Comment = "Reset and halt target"
+InitStep0_Value0 = 0x00000000
+InitStep0_Value1 = 0x00000000
+InitStep10_Action = "Write 32bit"
+InitStep10_Comment = "Bus width and wait status"
+InitStep10_Value0 = 0x48000000
+InitStep10_Value1 = 0x22111120
+InitStep11_Action = "Write 32bit"
+InitStep11_Comment = "Boot ROM control"
+InitStep11_Value0 = 0x48000004
+InitStep11_Value1 = 0x00002F50
+InitStep12_Action = "Write 32bit"
+InitStep12_Comment = "BANK1 control"
+InitStep12_Value0 = 0x48000008
+InitStep12_Value1 = 0x00000000
+InitStep13_Action = "Write 32bit"
+InitStep13_Comment = "BANK2 control"
+InitStep13_Value0 = 0x4800000C
+InitStep13_Value1 = 0x00000700
+InitStep14_Action = "Write 32bit"
+InitStep14_Comment = "BANK3 control"
+InitStep14_Value0 = 0x48000010
+InitStep14_Value1 = 0x00000700
+InitStep15_Action = "Write 32bit"
+InitStep15_Comment = "BANK4 control"
+InitStep15_Value0 = 0x48000014
+InitStep15_Value1 = 0x00000700
+InitStep16_Action = "Write 32bit"
+InitStep16_Comment = "BANK5 control"
+InitStep16_Value0 = 0x48000018
+InitStep16_Value1 = 0x00000700
+InitStep17_Action = "Write 32bit"
+InitStep17_Comment = "BANK6 control"
+InitStep17_Value0 = 0x4800001C
+InitStep17_Value1 = 0x00000700
+InitStep18_Action = "Write 32bit"
+InitStep18_Comment = "BANK7 control"
+InitStep18_Value0 = 0x48000020
+InitStep18_Value1 = 0x00000700
+InitStep19_Action = "Write 32bit"
+InitStep19_Comment = "SDRAM refresh"
+InitStep19_Value0 = 0x48000024
+InitStep19_Value1 = 0x008E0459
+InitStep1_Action = "Write 32bit"
+InitStep1_Comment = "pWTCON, Watchdog disable"
+InitStep1_Value0 = 0x53000000
+InitStep1_Value1 = 0x00000000
+InitStep20_Action = "Write 32bit"
+InitStep20_Comment = "Flexible Bank Size"
+InitStep20_Value0 = 0x48000028
+InitStep20_Value1 = 0x00000032
+InitStep21_Action = "Write 32bit"
+InitStep21_Comment = "Mode register set for SDRAM"
+InitStep21_Value0 = 0x4800002C
+InitStep21_Value1 = 0x00000030
+InitStep22_Action = "Write 32bit"
+InitStep22_Comment = "Mode register set for SDRAM"
+InitStep22_Value0 = 0x48000030
+InitStep22_Value1 = 0x00000030
+InitStep2_Action = "Write 32bit"
+InitStep2_Comment = "INTMSK, Interrupt Mask"
+InitStep2_Value0 = 0x4A000008
+InitStep2_Value1 = 0xFFFFFFFF
+InitStep3_Action = "Write 32bit"
+InitStep3_Comment = "INTSUBMSK"
+InitStep3_Value0 = 0x4A00001C
+InitStep3_Value1 = 0x000007FF
+InitStep4_Action = "Write 32bit"
+InitStep4_Comment = "pWTCON, Watchdog Timer"
+InitStep4_Value0 = 0x53000000
+InitStep4_Value1 = 0x00000000
+InitStep5_Action = "Write 32bit"
+InitStep5_Comment = "rGPFCON, Port F Control"
+InitStep5_Value0 = 0x56000050
+InitStep5_Value1 = 0x000055AA
+InitStep6_Action = "Write 32bit"
+InitStep6_Comment = "CLKDIVN, CPU prescaler control"
+InitStep6_Value0 = 0x4C000014
+InitStep6_Value1 = 0x00000007
+InitStep7_Action = "Write 32bit"
+InitStep7_Comment = "LOCKTIME"
+InitStep7_Value0 = 0x4C000000
+InitStep7_Value1 = 0x00FFFFFF
+InitStep8_Action = "Write 32bit"
+InitStep8_Comment = "MPLLCON"
+InitStep8_Value0 = 0x4C000004
+InitStep8_Value1 = 0x00061012
+InitStep9_Action = "Write 32bit"
+InitStep9_Comment = "UPLLCON"
+InitStep9_Value0 = 0x4C000008
+InitStep9_Value1 = 0x00040042
+
+
+load
