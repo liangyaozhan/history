@@ -352,6 +352,9 @@ void rtk_startup( void );
  */
 int task_priority_set( struct rtk_task *task, unsigned int priority );
 
+int task_errno_set( struct rtk_task *task, int err );
+int task_errno_get( struct rtk_task *task );
+
 
 /**
  *  @brief stop a task and deinitialize.
