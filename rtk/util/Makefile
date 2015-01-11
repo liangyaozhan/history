@@ -32,11 +32,11 @@ Makefile:;
 # 在定义目标文件之前需要包含一些定义，如：CPU
 include $(RTK_BASE)/makefiles/config.mk
 
+COBJS-$(CONFIG_SMALL_MEMLIB) += mem.o
+COBJS-$(CONFIG_SLAB_MEMLIB) += slab.o
+
 #编译到$(MODULE_NAME)的目标文件
-#COBJS   := $(patsubst %.c,%.o,$(wildcard *.c)) 
-COBJS   := mmu-armarchv4.o mmu_setup.o
-COBJS   += s3c2440_clock.o	s3c2440_int.o s3c2440_timer.o serial.o s3c2440_uart.o s3c2440.o
-COBJS   += s3c2440_lcd.o
+COBJS   := kprintf.o minilibc.o  rtkfork.o
 CPPOBJS := $(patsubst %.cpp,%.o,$(wildcard *.cpp)) 
 SOBJS   := $(patsubst %.S,%.o,$(wildcard *.S))
 
